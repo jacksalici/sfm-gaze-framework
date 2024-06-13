@@ -112,12 +112,36 @@ point3D = npz['gaze_center_in_rgb_frame']
 camera_params_1 = camera_parameters[image_id_1]
 camera_params_2 = camera_parameters[image_id_2]
 
-point2D_cam2 = reproject_point(camera_params_1, camera_params_2, point3D)
+point2D_cam2 = reproject_point(camera_params_1, camera_params_2, point3D).astype(int)
 
 print(f"Reprojected 2D point in the second camera frame: {point2D_cam2}")
 
-cam1_position_2D_cam2 = reproject_camera_position(camera_params_1, camera_params_2)
+cam1_position_2D_cam2 = reproject_camera_position(camera_params_1, camera_params_2).astype(int)
 print(f"Reprojected position of the first camera in the second camera frame: {cam1_position_2D_cam2}")
 
 
+import cv2, os
 
+
+
+img = cv2.imread(os.path.join(config['StructureFromMotion']['dataset_path'],
+                 camera_parameters[image_id_2]['image_name'] ))
+
+
+
+
+cv2.line(img,point2D_cam2,cam1_position_2D_cam2,(255,0,0),2)
+
+cv2.imshow("test", img)
+cv2.waitKey()
+
+img = cv2.imread(os.path.join(config['StructureFromMotion']['dataset_path'],
+                 camera_parameters[image_id_1]['image_name'] ))
+
+
+
+
+cv2.circle(img,npz['gaze_center_in_rgb_pixels'].astype(int), 2,(255,0,0),2)
+
+cv2.imshow("test", img)
+cv2.waitKey()
