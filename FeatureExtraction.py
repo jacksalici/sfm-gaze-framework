@@ -30,11 +30,9 @@ def main():
     feature_conf = extract_features.confs["superpoint_inloc"]
     matcher_conf = match_features.confs["superglue"]
 
-
     references = [p.relative_to(images).as_posix() for p in (images).iterdir()]
     print(len(references), "mapping images")
     #plot_images([read_image(images / r) for r in references], dpi=25)
-
 
     extract_features.main(
     feature_conf, images, image_list=references, feature_path=features
@@ -42,19 +40,11 @@ def main():
     pairs_from_exhaustive.main(sfm_pairs, image_list=references)
     match_features.main(matcher_conf, sfm_pairs, features=features, matches=matches);
 
-
     model = reconstruction.main(sfm_dir, images, sfm_pairs, features, matches, image_list=references)
 
-
-
     #visualization.visualize_sfm_2d(model, images, color_by="visibility", n=5)
-
-
     #visualization.visualize_sfm_2d(model, images, color_by="track_length", n=5)
-
-
     #visualization.visualize_sfm_2d(model, images, color_by="depth", n=5)
-
 
 
     fig = viz_3d.init_figure()
