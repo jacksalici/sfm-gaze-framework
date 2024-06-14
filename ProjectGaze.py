@@ -2,6 +2,11 @@ import numpy as np
 import sys
 import pycolmap
 import read_write_model
+import cv2, os
+
+import configparser
+config  = configparser.ConfigParser()
+config.read('config.ini')
 
 def load_camera_parameters_from_colmap_model(model_path):
     cameras, images, points3D = read_write_model.read_model(path=model_path, ext='.bin')
@@ -32,26 +37,18 @@ def load_camera_parameters_from_colmap_model(model_path):
         camera_parameters[image_id] = {'image_name':image.name ,'intrinsic': K, 'extrinsic': extrinsic_matrix}
     
     return camera_parameters
-
-import configparser
-config  = configparser.ConfigParser()
-config.read('config.ini')
-model_path = config['StructureFromMotion']['model_path']
-camera_parameters = load_camera_parameters_from_colmap_model(model_path)
-
-for image_id, params in camera_parameters.items():
-    print(f"Image ID: {image_id}, NAME: {params['image_name']}")
-    print("Intrinsic Matrix:")
-    print(params['intrinsic'])
-    print("Extrinsic Matrix:")
-    print(params['extrinsic'])
-
-
-outfile = '/Users/jacksalici/Desktop/SfmTesting/Test2/GazeOutput/img0.npz'
-npz = np.load(outfile)
-
     
 def reproject_point(camera_params_1, camera_params_2, point3D):
+    """Reproject 3d point from the frame of camera 1 to the frame of camera 2.
+
+    Args:
+        camera_params_1 (dict): ColMap camera params dict. Must contains "intrinsic" and "extrinsic" key.
+        camera_params_2 (dict): As above
+        point3D (list): 3-value list as camera 1 frame coordinates. 
+
+    Returns:
+        list: 2d point expressed as pixel of the 2 camera image.
+    """
 
     # Extract parameters for the first and second camera
     K1, extrinsic1 = camera_params_1['intrinsic'], camera_params_1['extrinsic']
@@ -71,62 +68,54 @@ def reproject_point(camera_params_1, camera_params_2, point3D):
     
     return point2D_cam2
 
-def reproject_camera_position(camera_params_1, camera_params_2):
-    # Extract parameters for the first and second camera
-    K2, extrinsic2 = camera_params_2['intrinsic'], camera_params_2['extrinsic']
+def main():
     
-    # First camera position in world coordinates
-    R1, t1 = camera_params_1['extrinsic'][:, :3], camera_params_1['extrinsic'][:, 3:]
-    cam1_position_world = -R1.T @ t1  # This is the origin (0, 0, 0) of the first camera frame transformed to world coordinates
+    model_path = config['StructureFromMotion']['model_path']
+    camera_parameters = load_camera_parameters_from_colmap_model(model_path)
+
+    for image_id, params in camera_parameters.items():
+        print(f"INFO: Image ID: {image_id}, NAME: {params['image_name']}")
+        print("INFO: Intrinsic Matrix:")
+        print(params['intrinsic'])
+        print("INFO: Extrinsic Matrix:")
+        print(params['extrinsic'])
+        
+    FPV_IMAGE_ID = 1
+    fpv_camera_params = camera_parameters[FPV_IMAGE_ID]
     
-    # Transform the first camera position from world frame to the second camera frame
-    R2, t2 = extrinsic2[:, :3], extrinsic2[:, 3:]
-    cam1_position_cam2 = R2 @ cam1_position_world + t2
     
-    # Project this position onto the image plane of the second camera
-    cam1_position_cam2_homogeneous = K2 @ cam1_position_cam2
-    cam1_position_2D_cam2 = cam1_position_cam2_homogeneous[:2] / cam1_position_cam2_homogeneous[2]
+    npz_file = np.load(os.path.join(config['StructureFromMotion']['gaze_output_path'], camera_parameters[FPV_IMAGE_ID]['image_name'][:-4] + '.npz'))
+
+    point3D = npz_file['gaze_center_in_rgb_frame']
     
-    return cam1_position_2D_cam2.reshape(1, -1)[0]
+    img_fpv = cv2.imread(os.path.join(config['StructureFromMotion']['dataset_path'],
+                            camera_parameters[FPV_IMAGE_ID]['image_name'] ))
 
+    cv2.circle(img_fpv,npz_file['gaze_center_in_rgb_pixels'].astype(int), 4,(255,255,0),3)
 
-image_id_1 = 1
-image_id_2 = 2
-point3D = npz['gaze_center_in_rgb_frame']
+    for image_id, params in camera_parameters.items():
+        if image_id != FPV_IMAGE_ID:
+            camera_params = camera_parameters[image_id]
 
-camera_params_1 = camera_parameters[image_id_1]
-camera_params_2 = camera_parameters[image_id_2]
+            point2D_cam2 = reproject_point(fpv_camera_params, camera_params, point3D).astype(int)
 
-point2D_cam2 = reproject_point(camera_params_1, camera_params_2, point3D).astype(int)
+            print(f"INFO: Reprojected 2D point in the {image_id} camera frame: {point2D_cam2}")
 
-print(f"Reprojected 2D point in the second camera frame: {point2D_cam2}")
-
-cam1_position_2D_cam2 = reproject_point(camera_params_1, camera_params_2).astype(int)
-print(f"Reprojected position of the first camera in the second camera frame: {cam1_position_2D_cam2}")
-
-
-import cv2, os
+            cam1_position_2D_cam2 = reproject_point(fpv_camera_params, camera_params, [0, 0, 0]).astype(int)
+            print(f"Reprojected position of the FPV camera in the {image_id} camera frame: {cam1_position_2D_cam2}")
 
 
 
-img = cv2.imread(os.path.join(config['StructureFromMotion']['dataset_path'],
-                 camera_parameters[image_id_2]['image_name'] ))
+            img = cv2.imread(os.path.join(config['StructureFromMotion']['dataset_path'],
+                            camera_parameters[image_id]['image_name'] ))
 
 
+            cv2.line(img,point2D_cam2,cam1_position_2D_cam2,(255,255,0),5, 2)
 
-
-cv2.line(img,point2D_cam2,cam1_position_2D_cam2,(0,255,255),5, 2)
-
-cv2.imshow("test", img)
-cv2.waitKey()
-
-img = cv2.imread(os.path.join(config['StructureFromMotion']['dataset_path'],
-                 camera_parameters[image_id_1]['image_name'] ))
-
-
-
-
-cv2.circle(img,npz['gaze_center_in_rgb_pixels'].astype(int), 2,(255,0,0),2)
-
-cv2.imshow("test", img)
-cv2.waitKey()
+            cv2.imshow(f"GAZE REPROJECTED IN FRAME {image_id}", img)
+            cv2.imshow("FPV FRAME", img_fpv)
+            cv2.waitKey()
+            
+    
+if __name__ == "__main__":
+    main()
