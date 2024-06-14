@@ -1,9 +1,6 @@
 import numpy as np
 import sys
-
 import pycolmap
-
-
 import read_write_model
 
 def load_camera_parameters_from_colmap_model(model_path):
@@ -20,25 +17,13 @@ def load_camera_parameters_from_colmap_model(model_path):
         extrinsic_matrix = np.hstack((R, t))
         
         # Intrinsic parameters
-        if camera.model == 'PINHOLE':
+        if camera.model == 'PINHOLE' or camera.model == 'OPENCV':
             K = np.array([[camera.params[0], 0, camera.params[2]],
                           [0, camera.params[1], camera.params[3]],
                           [0, 0, 1]])
-        elif camera.model == 'SIMPLE_PINHOLE':
+        elif camera.model == 'SIMPLE_PINHOLE' or camera.model == 'SIMPLE_RADIAL' or camera.model == 'RADIAL':
             K = np.array([[camera.params[0], 0, camera.params[1]],
                           [0, camera.params[0], camera.params[2]],
-                          [0, 0, 1]])
-        elif camera.model == 'SIMPLE_RADIAL':
-            K = np.array([[camera.params[0], 0, camera.params[1]],
-                          [0, camera.params[0], camera.params[2]],
-                          [0, 0, 1]])
-        elif camera.model == 'RADIAL':
-            K = np.array([[camera.params[0], 0, camera.params[1]],
-                          [0, camera.params[0], camera.params[2]],
-                          [0, 0, 1]])
-        elif camera.model == 'OPENCV':
-            K = np.array([[camera.params[0], 0, camera.params[2]],
-                          [0, camera.params[1], camera.params[3]],
                           [0, 0, 1]])
         else:
             raise Exception(f"Camera model {camera.model} is not supported")
@@ -62,7 +47,7 @@ for image_id, params in camera_parameters.items():
     print(params['extrinsic'])
 
 
-outfile = '/Users/jacksalici/Desktop/AriaRecording/test9singleframe/imgs/img0.npz'
+outfile = '/Users/jacksalici/Desktop/SfmTesting/Test2/GazeOutput/img0.npz'
 npz = np.load(outfile)
 
     
@@ -116,7 +101,7 @@ point2D_cam2 = reproject_point(camera_params_1, camera_params_2, point3D).astype
 
 print(f"Reprojected 2D point in the second camera frame: {point2D_cam2}")
 
-cam1_position_2D_cam2 = reproject_camera_position(camera_params_1, camera_params_2).astype(int)
+cam1_position_2D_cam2 = reproject_point(camera_params_1, camera_params_2).astype(int)
 print(f"Reprojected position of the first camera in the second camera frame: {cam1_position_2D_cam2}")
 
 
@@ -130,7 +115,7 @@ img = cv2.imread(os.path.join(config['StructureFromMotion']['dataset_path'],
 
 
 
-cv2.line(img,point2D_cam2,cam1_position_2D_cam2,(255,0,0),2)
+cv2.line(img,point2D_cam2,cam1_position_2D_cam2,(0,255,255),5, 2)
 
 cv2.imshow("test", img)
 cv2.waitKey()

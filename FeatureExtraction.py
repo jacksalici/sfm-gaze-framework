@@ -16,9 +16,9 @@ from hloc.utils import viz_3d
 
 def main():
 
-    images = Path("hloc/dataset")
+    images = Path("/Users/jacksalici/Desktop/SfmTesting/Test2/Dataset")
 
-    outputs = Path("hloc/output/")
+    outputs = Path("/Users/jacksalici/Desktop/SfmTesting/Test2/Output")
     sfm_pairs = outputs / "pairs-sfm.txt"
     sfm_dir = outputs / "sfm"
 
