@@ -15,10 +15,13 @@ from hloc.utils import viz_3d
 
 
 def main():
+    import configparser
+    config  = configparser.ConfigParser()
+    config.read('config.ini')
+    
+    images = Path(config['StructureFromMotion']['dataset_path'])
 
-    images = Path("/Users/jacksalici/Desktop/SfmTesting/Test2/Dataset")
-
-    outputs = Path("/Users/jacksalici/Desktop/SfmTesting/Test2/Output")
+    outputs = Path(config['StructureFromMotion']['model_path'])
     sfm_pairs = outputs / "pairs-sfm.txt"
     sfm_dir = outputs / "sfm"
 

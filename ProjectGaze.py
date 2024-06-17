@@ -70,7 +70,7 @@ def reproject_point(camera_params_1, camera_params_2, point3D):
 
 def main():
     
-    model_path = config['StructureFromMotion']['model_path']
+    model_path = os.path.join(config['StructureFromMotion']['model_path'], "sfm")
     camera_parameters = load_camera_parameters_from_colmap_model(model_path)
 
     for image_id, params in camera_parameters.items():
@@ -80,21 +80,23 @@ def main():
         print("INFO: Extrinsic Matrix:")
         print(params['extrinsic'])
         
-    FPV_IMAGE_ID = 1
-    fpv_camera_params = camera_parameters[FPV_IMAGE_ID]
+     
+    
+    FPV_image_id = int(config['StructureFromMotion']['FPV_image_id'])
+    fpv_camera_params = camera_parameters[FPV_image_id]
     
     
-    npz_file = np.load(os.path.join(config['StructureFromMotion']['gaze_output_path'], camera_parameters[FPV_IMAGE_ID]['image_name'][:-4] + '.npz'))
+    npz_file = np.load(os.path.join(config['StructureFromMotion']['gaze_output_path'], camera_parameters[FPV_image_id]['image_name'][:-4] + '.npz'))
 
     point3D = npz_file['gaze_center_in_rgb_frame']
     
     img_fpv = cv2.imread(os.path.join(config['StructureFromMotion']['dataset_path'],
-                            camera_parameters[FPV_IMAGE_ID]['image_name'] ))
+                            camera_parameters[FPV_image_id]['image_name'] ))
 
     cv2.circle(img_fpv,npz_file['gaze_center_in_rgb_pixels'].astype(int), 4,(255,255,0),3)
 
     for image_id, params in camera_parameters.items():
-        if image_id != FPV_IMAGE_ID:
+        if image_id != FPV_image_id:
             camera_params = camera_parameters[image_id]
 
             point2D_cam2 = reproject_point(fpv_camera_params, camera_params, point3D).astype(int)

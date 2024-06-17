@@ -24,8 +24,6 @@ import configparser
 config = configparser.ConfigParser()
 config.read("config.ini")
 
-DATASET_DIR = Path(config["StructureFromMotion"]["dataset_path"])
-MODEL_DIR = Path(config["StructureFromMotion"]["model_path"])
 FILTER_MIN_VISIBLE = 20
 
 
@@ -137,7 +135,7 @@ def read_and_log_sparse_reconstruction(
             f"camera{image.camera_id}", rr.ViewCoordinates.RDF, timeless=True
         )  # X=Right, Y=Down, Z=Forward
         
-        file = os.path.join(config['StructureFromMotion']['gaze_output_path'], image.name[:-4] + '.npz')
+        file = os.path.join(config['StructureFromMotion']['dataset_path'], image.name[:-4] + '.npz')
         
         
         if os.path.isfile(file):
@@ -252,9 +250,9 @@ def main() -> None:
         args, "rerun_example_structure_from_motion", default_blueprint=blueprint
     )
     
-    cameras, images, points3D = import_model(MODEL_DIR)
+    cameras, images, points3D = import_model(Path(config["StructureFromMotion"]["model_path"]) / "sfm")
     
-    read_and_log_sparse_reconstruction(cameras, images, points3D, DATASET_DIR, resize=args.resize)
+    read_and_log_sparse_reconstruction(cameras, images, points3D, Path(config["StructureFromMotion"]["dataset_path"]), resize=args.resize)
     
     camera_parameters = calc_cameras_parameters(cameras, images)
     add_gaze_direction(camera_parameters, cameras, images)
