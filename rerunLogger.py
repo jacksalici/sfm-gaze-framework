@@ -25,6 +25,7 @@ config = configparser.ConfigParser()
 config.read("config.ini")
 
 FILTER_MIN_VISIBLE = 20
+PHOTOS = 'ALL_RGB' # ALL / ALL_RGB /None
 
 
 def scale_camera(
@@ -86,7 +87,7 @@ def read_and_log_sparse_reconstruction(
     point_errors = [point.error for point in points3D.values()]
 
     rr.log(
-        "points",
+        "/points",
         rr.Points3D(points, colors=point_colors),
         rr.AnyValues(error=point_errors),
         timeless=True,
@@ -94,6 +95,9 @@ def read_and_log_sparse_reconstruction(
 
     for image in sorted(images.values(), key=lambda im: im.name):  # type: ignore[no-any-return]
         image_file = dataset_path / image.name
+        
+        if PHOTOS == 'ALL_RGB' and "rgb" not in image.name:
+            continue
 
         if not os.path.exists(image_file):
             continue
@@ -129,10 +133,10 @@ def read_and_log_sparse_reconstruction(
                 rotation=rr.Quaternion(xyzw=quat_xyzw),
                 from_parent=True,
             ),
-            timeless=True,
+            #timeless=True,
         )
         rr.log(
-            f"camera{image.camera_id}", rr.ViewCoordinates.RDF, timeless=True
+            f"camera{image.camera_id}", rr.ViewCoordinates.RDF, #timeless=True
         )  # X=Right, Y=Down, Z=Forward
         
         file = os.path.join(config['StructureFromMotion']['dataset_path'], image.name[:-4] + '.npz')
@@ -159,7 +163,7 @@ def read_and_log_sparse_reconstruction(
                 focal_length=f,
                 principal_point=c,
             ),
-            timeless=True,
+            #timeless=True,
         )
 
         if resize:
@@ -174,13 +178,13 @@ def read_and_log_sparse_reconstruction(
             rr.log(
                 f"camera{image.camera_id}/image",
                 rr.ImageEncoded(path=dataset_path / image.name),
-                timeless=True
+                #timeless=True
             )
 
         rr.log(
             f"camera{image.camera_id}/image/keypoints",
             rr.Points2D(visible_xys, colors=[34, 138, 167]),
-            timeless=True
+            #timeless=True
         )
 
 def calc_cameras_parameters(cameras, images):
@@ -216,13 +220,13 @@ def add_gaze_direction(camera_parameters, cameras, images):
     FPV_IMAGE_ID = 1
     fpv_camera_params = camera_parameters[FPV_IMAGE_ID]
     
-    npz_file = np.load(os.path.join(config['StructureFromMotion']['gaze_output_path'], fpv_camera_params['image_name'][:-4] + '.npz'))
+    #npz_file = np.load(os.path.join(config['StructureFromMotion']['gaze_output_path'], fpv_camera_params['image_name'][:-4] + '.npz'))
     
-    point = npz_file['gaze_center_in_rgb_frame']
+    #point = npz_file['gaze_center_in_rgb_frame']
     
-    point_world = reproject_point(fpv_camera_params, point)[:3]
-    camera_world = reproject_point(fpv_camera_params, [0,0,0])[:3] 
-    rr.log('gaze', rr.Arrows3D(vectors=[point_world-camera_world], origins=[camera_world], colors=[1, 0.7, 0.7]))
+    #point_world = reproject_point(fpv_camera_params, point)[:3]
+    #camera_world = reproject_point(fpv_camera_params, [0,0,0])[:3] 
+    #rr.log('gaze', rr.Arrows3D(vectors=[point_world-camera_world], origins=[camera_world], colors=[1, 0.7, 0.7]))
 
     
     
@@ -254,8 +258,8 @@ def main() -> None:
     
     read_and_log_sparse_reconstruction(cameras, images, points3D, Path(config["StructureFromMotion"]["dataset_path"]), resize=args.resize)
     
-    camera_parameters = calc_cameras_parameters(cameras, images)
-    add_gaze_direction(camera_parameters, cameras, images)
+    #camera_parameters = calc_cameras_parameters(cameras, images)
+    #add_gaze_direction(camera_parameters, cameras, images)
     
     rr.script_teardown(args)
     
