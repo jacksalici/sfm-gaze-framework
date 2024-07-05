@@ -25,7 +25,7 @@ config = configparser.ConfigParser()
 config.read("config.ini")
 
 FILTER_MIN_VISIBLE = 20
-PHOTOS = 'ALL_RGB' # ALL / ALL_RGB /None
+PHOTOS = None # ALL / ALL_RGB /None
 
 
 def scale_camera(
@@ -98,6 +98,9 @@ def read_and_log_sparse_reconstruction(
         
         if PHOTOS == 'ALL_RGB' and "rgb" not in image.name:
             continue
+        
+        if PHOTOS == None:
+            continue
 
         if not os.path.exists(image_file):
             continue
@@ -139,8 +142,7 @@ def read_and_log_sparse_reconstruction(
             f"camera{image.camera_id}", rr.ViewCoordinates.RDF, #timeless=True
         )  # X=Right, Y=Down, Z=Forward
         
-        file = os.path.join(config['StructureFromMotion']['dataset_path'], image.name[:-4] + '.npz')
-        
+        file = os.path.join(config['StructureFromMotion']['gaze_output_path'], f'img{image.name[3]}.npz')
         
         if os.path.isfile(file):
             
