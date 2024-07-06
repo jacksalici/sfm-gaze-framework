@@ -25,7 +25,9 @@ config = configparser.ConfigParser()
 config.read("config.ini")
 
 FILTER_MIN_VISIBLE = 20
-PHOTOS = None # ALL / ALL_RGB /None
+FPV_IMAGE_NAME = "img10rgb.jpg"
+
+PHOTOS = "1"  # ALL / ALL_RGB / 1 / None
 
 
 def scale_camera(
@@ -47,35 +49,48 @@ def scale_camera(
         scale_factor,
     )
     
-def reproject_point(camera_params_1, point3D):
-    """Reproject 3d point from the frame of camera 1 to the global frame
+def inv_transformation_matrix(E):
+    R = E[:3, :3]
+    T = E[:3, -1].reshape((3,1))
+    assert R.shape == (3,3) and T.shape == (3, 1)
+    return np.hstack((R.T,-R.T@T))
+    
 
-    Args:
-        camera_params_1 (dict): ColMap camera params dict. Must contains "intrinsic" and "extrinsic" key.
+
+def reproject_point(E, point3D, inv=True):
+    """Reproject 3d point from the frame of camera 1 to the global frame
+    
+    E: Extrinsic Matrix from "World Space" to Point Space
 
     Returns:
         list: 2d point expressed as pixel of the 2 camera image.
     """
-
-    # Extract parameters for the first and second camera
-    K1, extrinsic1 = camera_params_1['intrinsic'], camera_params_1['extrinsic']
     
-    # Transform the 3D point from the first camera frame to the world frame
+    if inv:
+        E = inv_transformation_matrix(E)
+        
+    if E.shape == (3, 4):
+        E = np.append(E, [[0, 0, 0, 1]], axis=0)
+    
     point3D_homogeneous = np.append(point3D, 1)  # Convert to homogeneous coordinates
-    world_point = np.linalg.inv(np.append(extrinsic1, [[0, 0, 0, 1]], axis=0)) @ point3D_homogeneous
-    
-    return world_point
+    point3d_E = (
+        E
+        @ point3D_homogeneous
+    )
+
+    return point3d_E[:3]
 
 
 def import_model(model_path: Path):
     print("INFO: Reading sparse COLMAP reconstruction")
     cameras, images, points3D = read_model(model_path, ext=".bin")
-    return cameras, images, points3D 
+    return cameras, images, points3D
+
 
 def read_and_log_sparse_reconstruction(
     cameras, images, points3D, dataset_path: Path, resize: tuple[int, int] | None
 ) -> None:
-    
+
     print("INFO: Building visualization by logging to Rerun")
 
     rr.log("/", rr.ViewCoordinates.RIGHT_HAND_Y_DOWN)
@@ -95,11 +110,14 @@ def read_and_log_sparse_reconstruction(
 
     for image in sorted(images.values(), key=lambda im: im.name):  # type: ignore[no-any-return]
         image_file = dataset_path / image.name
-        
-        if PHOTOS == 'ALL_RGB' and "rgb" not in image.name:
+
+        if PHOTOS == "ALL_RGB" and "rgb" not in image.name:
             continue
-        
-        if PHOTOS == None:
+
+        elif PHOTOS == None:
+            continue
+
+        elif PHOTOS == "1" and FPV_IMAGE_NAME != image.name:
             continue
 
         if not os.path.exists(image_file):
@@ -136,27 +154,32 @@ def read_and_log_sparse_reconstruction(
                 rotation=rr.Quaternion(xyzw=quat_xyzw),
                 from_parent=True,
             ),
-            #timeless=True,
+            # timeless=True,
         )
         rr.log(
-            f"camera{image.camera_id}", rr.ViewCoordinates.RDF, #timeless=True
+            f"camera{image.camera_id}",
+            rr.ViewCoordinates.RDF,  # timeless=True
         )  # X=Right, Y=Down, Z=Forward
-        
-        file = os.path.join(config['StructureFromMotion']['gaze_output_path'], f'img{image.name[3]}.npz')
-        
+
+        file = os.path.join(
+            config["StructureFromMotion"]["gaze_output_path"], f"img{image.name[3]}.npz"
+        )
+
         if os.path.isfile(file):
-            
+
             npz_file = np.load(file)
             # use exact intrinsic
-            params = npz_file['rbg_camera_intrinsic']
-            f, c = params[:2], params[2:]   
-            
-       
-        else:    
-            f, c = camera.params[:2], camera.params[2:]   
-            
-            if camera.model != 'PINHOLE':
-                f, c = [camera.params[1], camera.params[2]], [camera.params[0], camera.params[3]]
+            params = npz_file["rbg_camera_intrinsic"]
+            f, c = params[:2], params[2:]
+
+        else:
+            f, c = camera.params[:2], camera.params[2:]
+
+            if camera.model != "PINHOLE":
+                f, c = [camera.params[1], camera.params[2]], [
+                    camera.params[0],
+                    camera.params[3],
+                ]
 
         rr.log(
             f"camera{image.camera_id}/image",
@@ -165,7 +188,7 @@ def read_and_log_sparse_reconstruction(
                 focal_length=f,
                 principal_point=c,
             ),
-            #timeless=True,
+            # timeless=True,
         )
 
         if resize:
@@ -180,58 +203,142 @@ def read_and_log_sparse_reconstruction(
             rr.log(
                 f"camera{image.camera_id}/image",
                 rr.ImageEncoded(path=dataset_path / image.name),
-                #timeless=True
+                # timeless=True
             )
 
         rr.log(
             f"camera{image.camera_id}/image/keypoints",
             rr.Points2D(visible_xys, colors=[34, 138, 167]),
-            #timeless=True
+            # timeless=True
         )
 
-def calc_cameras_parameters(cameras, images):
-    camera_parameters = {}
-    
+
+def calc_fpv_camera_parameters(cameras, images):
+
     for image_id, image in images.items():
-        camera = cameras[image.camera_id]
+        if image.name != FPV_IMAGE_NAME:
+            continue
         
+        camera = cameras[image.camera_id]
+
         # Extrinsic parameters
         R = qvec2rotmat(image.qvec)
         t = image.tvec.reshape(3, 1)
-        extrinsic_matrix = np.hstack((R, t))
-        
+        E = np.hstack((R, t))
+
         # Intrinsic parameters
-        if camera.model == 'PINHOLE' or camera.model == 'OPENCV':
-            K = np.array([[camera.params[0], 0, camera.params[2]],
-                          [0, camera.params[1], camera.params[3]],
-                          [0, 0, 1]])
-        elif camera.model == 'SIMPLE_PINHOLE' or camera.model == 'SIMPLE_RADIAL' or camera.model == 'RADIAL':
-            K = np.array([[camera.params[0], 0, camera.params[1]],
-                          [0, camera.params[0], camera.params[2]],
-                          [0, 0, 1]])
+        file = os.path.join(
+            config["StructureFromMotion"]["gaze_output_path"], f"img{image.name[3]}.npz"
+        )
+
+        if os.path.isfile(file):
+
+            npz_file = np.load(file)
+            # use exact intrinsic
+            params = npz_file["rbg_camera_intrinsic"]
+            f, c = params[:2], params[2:]
+            K = np.array(
+                    [
+                        [f[0], 0, c[0]],
+                        [0, f[1], c[1]],
+                        [0, 0, 1],
+                    ]
+                )
+            
         else:
-            raise Exception(f"Camera model {camera.model} is not supported")
+            if camera.model == "PINHOLE" or camera.model == "OPENCV":
+                K = np.array(
+                    [
+                        [camera.params[0], 0, camera.params[2]],
+                        [0, camera.params[1], camera.params[3]],
+                        [0, 0, 1],
+                    ]
+                )
+            elif (
+                camera.model == "SIMPLE_PINHOLE"
+                or camera.model == "SIMPLE_RADIAL"
+                or camera.model == "RADIAL"
+            ):
+                K = np.array(
+                    [
+                        [camera.params[0], 0, camera.params[1]],
+                        [0, camera.params[0], camera.params[2]],
+                        [0, 0, 1],
+                    ]
+                )
+            else:
+                raise Exception(f"Camera model {camera.model} is not supported")
 
-        # Store the parameters
-        camera_parameters[image_id] = {'image_name':image.name ,'intrinsic': K, 'extrinsic': extrinsic_matrix}
-    
-    return camera_parameters
+    return E, K
 
 
-def add_gaze_direction(camera_parameters, cameras, images):
-    FPV_IMAGE_ID = 1
-    fpv_camera_params = camera_parameters[FPV_IMAGE_ID]
-    
-    #npz_file = np.load(os.path.join(config['StructureFromMotion']['gaze_output_path'], fpv_camera_params['image_name'][:-4] + '.npz'))
-    
-    #point = npz_file['gaze_center_in_rgb_frame']
-    
-    #point_world = reproject_point(fpv_camera_params, point)[:3]
-    #camera_world = reproject_point(fpv_camera_params, [0,0,0])[:3] 
-    #rr.log('gaze', rr.Arrows3D(vectors=[point_world-camera_world], origins=[camera_world], colors=[1, 0.7, 0.7]))
+def add_gaze_direction(cameras, images):
+    E, K = calc_fpv_camera_parameters(cameras, images)
 
+    npz_file = np.load(
+        os.path.join(
+            config["StructureFromMotion"]["gaze_output_path"],
+            FPV_IMAGE_NAME[0:4] + ".npz",
+        )
+    )
+
+
+    gaze_yaw_pitch = npz_file["gaze_yaw_pitch"]
+    yaw_cpf, pitch_cpf = gaze_yaw_pitch[0], gaze_yaw_pitch[1]
+
+    vector_cpf = pitch_yaw_to_vector(pitch_cpf, yaw_cpf)
+    
+    E_cpf2rgb = npz_file["rbg_camera_extrinsic"]
+    
+    cpf_w = reproject_point(E, reproject_point(E_cpf2rgb, [0, 0, 0]))
+    
+    vector_rgb = (np.linalg.inv(E_cpf2rgb) @ np.append(vector_cpf, [1]))[:3]
+
+    vector_w = reproject_point(E, vector_rgb)
     
     
+    rr.log(
+        "gaze",
+        rr.Arrows3D(
+            vectors=[(vector_w-cpf_w)*10],
+            origins=[cpf_w],
+            colors=[1, 0.7, 0.7],
+        ),
+    )
+
+def add_gaze_direction_from_point(cameras, images):
+    E, K = calc_fpv_camera_parameters(cameras, images)
+
+    npz_file = np.load(
+        os.path.join(
+            config["StructureFromMotion"]["gaze_output_path"],
+            FPV_IMAGE_NAME[0:4] + ".npz",
+        )
+    )
+    
+    gaze_rgb = npz_file["gaze_center_in_rgb_frame"]
+    
+    rgb_w = reproject_point(E, [0, 0, 0])
+    gaze_w = reproject_point(E, gaze_rgb)
+    
+    rr.log(
+        "gaze2",
+        rr.Arrows3D(
+            vectors=[(gaze_w-rgb_w)*10],
+            origins=[rgb_w],
+            colors=[0.7, 1, 0.7],
+        ),
+    )
+
+def pitch_yaw_to_vector(yaw_rad, pitch_rad):
+    # inspired by https://github.com/facebookresearch/projectaria_tools/blob/3f6079ffcd21b8975fed2ce2bef211473bc498ad/core/mps/EyeGazeReader.h#L40
+
+    x = np.tan(yaw_rad)
+    y = np.tan(pitch_rad)
+    z = 1
+
+    direction = np.array([x, y, z])
+    return direction / np.linalg.norm(direction)
 
 
 def main() -> None:
@@ -249,23 +356,29 @@ def main() -> None:
 
     blueprint = rrb.Horizontal(
         rrb.Spatial3DView(name="3D", origin="/"),
-        
     )
 
     rr.script_setup(
         args, "rerun_example_structure_from_motion", default_blueprint=blueprint
     )
-    
-    cameras, images, points3D = import_model(Path(config["StructureFromMotion"]["model_path"]) / "sfm")
-    
-    read_and_log_sparse_reconstruction(cameras, images, points3D, Path(config["StructureFromMotion"]["dataset_path"]), resize=args.resize)
-    
-    #camera_parameters = calc_cameras_parameters(cameras, images)
-    #add_gaze_direction(camera_parameters, cameras, images)
-    
+
+    cameras, images, points3D = import_model(
+        Path(config["StructureFromMotion"]["model_path"]) / "sfm"
+    )
+
+    read_and_log_sparse_reconstruction(
+        cameras,
+        images,
+        points3D,
+        Path(config["StructureFromMotion"]["dataset_path"]),
+        resize=args.resize,
+    )
+
+    add_gaze_direction(cameras, images)
+    add_gaze_direction_from_point(cameras, images)
+
+
     rr.script_teardown(args)
-    
-    
 
 
 if __name__ == "__main__":
