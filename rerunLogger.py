@@ -25,7 +25,7 @@ config = configparser.ConfigParser()
 config.read("config.ini")
 
 FILTER_MIN_VISIBLE = 20
-FPV_IMAGE_NAME = "img10rgb.jpg"
+FPV_IMAGE_NAME = "img12rgb.jpg"
 
 PHOTOS = "1"  # ALL / ALL_RGB / 1 / None
 
@@ -292,7 +292,7 @@ def add_gaze_direction(cameras, images):
     
     cpf_w = reproject_point(E, reproject_point(E_cpf2rgb, [0, 0, 0]))
     
-    vector_rgb = (np.linalg.inv(E_cpf2rgb) @ np.append(vector_cpf, [1]))[:3]
+    vector_rgb = (inv_transformation_matrix(E_cpf2rgb) @ np.append(vector_cpf, [1]))[:3]
 
     vector_w = reproject_point(E, vector_rgb)
     
