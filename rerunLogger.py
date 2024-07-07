@@ -25,7 +25,7 @@ config = configparser.ConfigParser()
 config.read("config.ini")
 
 FILTER_MIN_VISIBLE = 20
-FPV_IMAGE_NAME = "img12rgb.jpg"
+FPV_IMAGE_NAME = "img8rgb.jpg"
 
 PHOTOS = "1"  # ALL / ALL_RGB / 1 / None
 
@@ -305,6 +305,8 @@ def add_gaze_direction(cameras, images):
             colors=[1, 0.7, 0.7],
         ),
     )
+    
+    return vector_w, cpf_w
 
 def add_gaze_direction_from_point(cameras, images):
     E, K = calc_fpv_camera_parameters(cameras, images)
@@ -329,6 +331,8 @@ def add_gaze_direction_from_point(cameras, images):
             colors=[0.7, 1, 0.7],
         ),
     )
+    
+   
 
 def pitch_yaw_to_vector(yaw_rad, pitch_rad):
     # inspired by https://github.com/facebookresearch/projectaria_tools/blob/3f6079ffcd21b8975fed2ce2bef211473bc498ad/core/mps/EyeGazeReader.h#L40
@@ -339,6 +343,32 @@ def pitch_yaw_to_vector(yaw_rad, pitch_rad):
 
     direction = np.array([x, y, z])
     return direction / np.linalg.norm(direction)
+
+
+def select_nearest(vector, origin, points3D):
+    distance_min = np.inf
+    distance_min_point_id = 0
+
+    for p_id, p in points3D.items():
+        point_position = np.array(p.xyz)
+        
+        distance_cur = np.linalg.norm(np.cross(vector-origin, point_position-origin)) / np.linalg.norm(vector-origin)
+        
+        if distance_cur<distance_min:
+            distance_min = distance_cur
+            distance_min_point_id = p_id
+            
+    print(distance_min_point_id, distance_min)
+
+
+
+    point3D_position = np.array(points3D[distance_min_point_id].xyz)
+    
+    rr.log(
+        "/nearestPoint",
+        rr.Points3D(point3D_position, colors=[0,0,0]),
+        timeless=True,
+    )
 
 
 def main() -> None:
@@ -374,7 +404,8 @@ def main() -> None:
         resize=args.resize,
     )
 
-    add_gaze_direction(cameras, images)
+    cpf, vector = add_gaze_direction(cameras, images)
+    select_nearest(vector, cpf, points3D)
     add_gaze_direction_from_point(cameras, images)
 
 
