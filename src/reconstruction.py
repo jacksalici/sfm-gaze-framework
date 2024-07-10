@@ -19,9 +19,9 @@ def main():
     config  = configparser.ConfigParser()
     config.read('config.ini')
     
-    images = Path(config['StructureFromMotion']['dataset_path'])
+    images = Path(config['dataset_path'])
 
-    outputs = Path(config['StructureFromMotion']['model_path'])
+    outputs = Path(config['model_path'])
     sfm_pairs = outputs / "pairs-sfm.txt"
     sfm_dir = outputs / "sfm"
 
@@ -44,11 +44,6 @@ def main():
     match_features.main(matcher_conf, sfm_pairs, features=features, matches=matches);
 
     model = reconstruction.main(sfm_dir, images, sfm_pairs, features, matches, image_list=references)
-
-    #visualization.visualize_sfm_2d(model, images, color_by="visibility", n=5)
-    #visualization.visualize_sfm_2d(model, images, color_by="track_length", n=5)
-    #visualization.visualize_sfm_2d(model, images, color_by="depth", n=5)
-
 
     fig = viz_3d.init_figure()
     viz_3d.plot_reconstruction(

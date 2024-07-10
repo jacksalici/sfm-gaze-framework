@@ -17,12 +17,10 @@ import numpy.typing as npt
 import rerun as rr
 import rerun.blueprint as rrb
 
-from read_write_model import Camera, read_model, qvec2rotmat
+from src.external.read_write_model import Camera, read_model, qvec2rotmat
 
-import configparser
-
-config = configparser.ConfigParser()
-config.read("config.ini")
+import tomllib
+config = tomllib.load(open('config.toml', 'rb'))
 
 FILTER_MIN_VISIBLE = 20
 FPV_IMAGE_NAME = "img8rgb.jpg"
@@ -162,7 +160,7 @@ def read_and_log_sparse_reconstruction(
         )  # X=Right, Y=Down, Z=Forward
 
         file = os.path.join(
-            config["StructureFromMotion"]["gaze_output_path"], f"img{image.name[3]}.npz"
+            config["gaze_output_path"], f"img{image.name[3]}.npz"
         )
 
         if os.path.isfile(file):
@@ -228,7 +226,7 @@ def calc_fpv_camera_parameters(cameras, images):
 
         # Intrinsic parameters
         file = os.path.join(
-            config["StructureFromMotion"]["gaze_output_path"], f"img{image.name[3]}.npz"
+            config["gaze_output_path"], f"img{image.name[3]}.npz"
         )
 
         if os.path.isfile(file):
@@ -277,7 +275,7 @@ def add_gaze_direction(cameras, images):
 
     npz_file = np.load(
         os.path.join(
-            config["StructureFromMotion"]["gaze_output_path"],
+            config["gaze_output_path"],
             FPV_IMAGE_NAME[0:4] + ".npz",
         )
     )
@@ -313,7 +311,7 @@ def add_gaze_direction_from_point(cameras, images):
 
     npz_file = np.load(
         os.path.join(
-            config["StructureFromMotion"]["gaze_output_path"],
+            config["gaze_output_path"],
             FPV_IMAGE_NAME[0:4] + ".npz",
         )
     )
@@ -393,14 +391,14 @@ def main() -> None:
     )
 
     cameras, images, points3D = import_model(
-        Path(config["StructureFromMotion"]["model_path"]) / "sfm"
+        Path(config["model_path"]) / "sfm"
     )
 
     read_and_log_sparse_reconstruction(
         cameras,
         images,
         points3D,
-        Path(config["StructureFromMotion"]["dataset_path"]),
+        Path(config["dataset_path"]),
         resize=args.resize,
     )
 

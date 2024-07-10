@@ -1,0 +1,4 @@
+model_path = 'path_to_/Output' #folder containing the output of the sfm procedure
+dataset_path = 'path_to_/Dataset' #folder containing the images
+gaze_output_path = 'path_to_/GazeOutput' #folder containing the npz files
+FPV_image_id = 1
