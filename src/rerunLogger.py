@@ -17,10 +17,10 @@ import numpy.typing as npt
 import rerun as rr
 import rerun.blueprint as rrb
 
-from src.external.read_write_model import Camera, read_model, qvec2rotmat
+from external.read_write_model import Camera, read_model, qvec2rotmat
 
 import tomllib
-config = tomllib.load(open('config.toml', 'rb'))
+config = tomllib.load(open("config.toml", "rb"))
 
 FILTER_MIN_VISIBLE = 20
 FPV_IMAGE_NAME = "img8rgb.jpg"
