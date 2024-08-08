@@ -286,7 +286,7 @@ def add_gaze_direction(cameras, images):
 
     vector_cpf = pitch_yaw_to_vector(pitch_cpf, yaw_cpf)
     
-    E_cpf2rgb = npz_file["rbg_camera_extrinsic"]
+    E_cpf2rgb = npz_file["rbg2cpf_camera_extrinsic"]
     
     cpf_w = reproject_point(E, reproject_point(E_cpf2rgb, [0, 0, 0]))
     
@@ -404,7 +404,7 @@ def main() -> None:
 
     cpf, vector = add_gaze_direction(cameras, images)
     select_nearest(vector, cpf, points3D)
-    add_gaze_direction_from_point(cameras, images)
+    #add_gaze_direction_from_point(cameras, images)
 
 
     rr.script_teardown(args)

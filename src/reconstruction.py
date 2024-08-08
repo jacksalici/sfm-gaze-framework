@@ -14,14 +14,8 @@ from hloc.visualization import plot_images, read_image
 from hloc.utils import viz_3d
 
 
-def main():
-    import configparser
-    config  = configparser.ConfigParser()
-    config.read('config.ini')
+def reconstruct(images: Path, outputs: Path):
     
-    images = Path(config['dataset_path'])
-
-    outputs = Path(config['model_path'])
     sfm_pairs = outputs / "pairs-sfm.txt"
     sfm_dir = outputs / "sfm"
 
@@ -54,4 +48,11 @@ def main():
 import multiprocessing
 if __name__ == '__main__':
     multiprocessing.freeze_support()  # Only needed for frozen executables
-    main()
+
+    import tomllib
+    config = tomllib.load(open("config.toml", "rb"))
+    
+    images = Path(config['dataset_path'])
+    outputs = Path(config['model_path'])
+    
+    reconstruct(images, outputs)
