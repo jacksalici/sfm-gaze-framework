@@ -404,7 +404,7 @@ def main() -> None:
 
     cpf, vector = add_gaze_direction(cameras, images)
     select_nearest(vector, cpf, points3D)
-    #add_gaze_direction_from_point(cameras, images)
+    add_gaze_direction_from_point(cameras, images)
 
 
     rr.script_teardown(args)
