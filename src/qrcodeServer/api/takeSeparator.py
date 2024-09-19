@@ -1,5 +1,5 @@
 import qrcode #pypi.python.org/pypi/qrcode
-from pyzbar.pyzbar import decode
+#from pyzbar.pyzbar import decode
 from PIL import Image
 
 def create_number(scene, participant, take):
@@ -34,12 +34,6 @@ def encode(scene, participant, take):
     img = qr.make_image(fill_color="black", back_color="white")
     
     return img
-
-
-def decode(img: Image):
-    data = decode(img)
-    decoded_num = int(data[0].data)
-    return extract_codes(decoded_num)
 
 
 

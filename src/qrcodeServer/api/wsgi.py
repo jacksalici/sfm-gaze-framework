@@ -1,5 +1,5 @@
 from flask import Flask, send_file, redirect, render_template
-from takeSeparator import encode
+from .takeSeparator import encode
 import io
 import base64
 
