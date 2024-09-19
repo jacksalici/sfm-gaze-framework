@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
     <title>QR-Code Take Separator</title>
     <style>
         body {
@@ -25,27 +26,84 @@
 
         }
         .data div {
-            flex: 1;
-            font-size: 3em;
+            font-size: 1em;
             margin: 5px;
+            background-color: #f5f5f5;
+            padding: 5px;
+            border-radius: 20px;
         }
         .data div span {
-            font-size: 5em;
+            font-size: 3em;
             display: block;
+        }
+
+        button {
+            background-color:  #f5f5f5;
+            color: black;
+            padding: 5px;
+            margin: 5px;
+            border: 2px, solid, black;
+            border-radius: 10px;
+            font-size: 20px;
+            width: fit-content;
+            min-width: 50px;
+        }
+
+        button:active{
+            background-color: lightgray;
+        }
+
+        #back{
+            margin-top: 40px;
         }
     </style>
 </head>
 <body>
     <img src="data:image/png;base64, {{image}}" />
     <div class="data">
-        <div>Scene:
-            <span>{{scene}}</span>
+        <div>
+            Scene 🏡
+            <span id="scene">{{scene}}</span>
+            <button onclick="updateValue('scene', 1)">👆</button>
+            <button onclick="updateValue('scene', -1)">👇</button>
+            
         </div>
-        <div>Participant:
-            <span>{{participant}}</span>
+        <div>Participant 💃
+            <span id="participant">{{participant}}</span>
+            <button onclick="updateValue('participant', 1)">👆</button>
+            <button onclick="updateValue('participant', -1)">👇</button>
         </div>
-        <div>Take:
-            <span>{{take}}</span></div>
+        <div>Take 🎬
+            <span id="take">{{take}}</span>
+            <button onclick="updateValue('take', 1)">👆</button>
+            <button onclick="updateValue('take', -1)">👇</button>
+        </div>
     </div>
+    <button id="back" onclick="window.location.href = '/0/0/0'">🔙 to 0/0/0 ♻️</button>
+
+
+
+    <script>
+        // Function to update the value and redirect
+        function updateValue(id, change) {
+            // Get the current values for scene, participant, and take
+            var values = {
+                scene : parseInt(document.getElementById('scene').textContent),
+                participant : parseInt(document.getElementById('participant').textContent),
+                take : parseInt(document.getElementById('take').textContent)
+            }
+
+            values[id] += change;
+            
+            if(values[id]<0){
+                values[id] = 1000 + values[id]
+            }else if (values[id]>999){
+                values[id] = values[id]-1000
+            }
+    
+
+            window.location.href = `/${[values.scene]}/${values.participant}/${values.take}`;
+        }
+    </script>
 </body>
 </html>
