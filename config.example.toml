@@ -2,3 +2,10 @@ model_path = 'path_to_/Output' #folder containing the output of the sfm procedur
 dataset_path = 'path_to_/Dataset' #folder containing the images
 gaze_output_path = 'path_to_/GazeOutput' #folder containing the npz files
 FPV_image_id = 1
+
+
+
+[aria_recordings]
+
+recordings_sheet = "path_to_/recordings_sheet.csv" #csv with timestamp info about takes
+vrs_glob = "path_to_raw_vrss_folder" #folder containing all the ofiginal files
