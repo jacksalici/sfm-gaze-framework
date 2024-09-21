@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 
 import os
+from pathlib import Path
 
 SLAM = False
 
@@ -26,19 +27,26 @@ def blurryness(img):
     return -cv2.Laplacian(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), cv2.CV_64F).var()
 
 import csv   
-def save_info(file_path,start_timestamp,end_timestamp,scene,participant,take,header = False):
-    if os.path.isfile(file_path) and header:
-        # don't recreate header for existing files
-        return
+def save_info(file_path, start_timestamp, end_timestamp,scene,participant,take):
+    csv_file = config["aria_recordings"]["recordings_sheet"]
+    csv_file_exists = True
     
-    if header:
-        fields=['file_path','start_timestamp','end_timestamp','scene','participant','take']
-    else:
-        fields=[file_path,start_timestamp,end_timestamp,scene,participant,take]
-    with open(config["aria_recordings"]["recordings_sheet"], 'a') as f:
-        writer = csv.writer(f)
-        writer.writerow(fields)
+    if not os.path.exists(csv_file):
+        csv_file_exists = False
         
+
+    with open(csv_file, 'a') as f:
+        writer = csv.writer(f)
+        
+        if not csv_file_exists:
+            #save header once
+            fields=['file_path','session_id', 'start_timestamp','end_timestamp','scene','participant','take']
+            writer.writerow(fields)
+        
+        fields=[file_path, Path(file_path).parts[-2],  start_timestamp,end_timestamp,scene,participant,take]
+        writer.writerow(fields)
+
+
 
 from pyzbar.pyzbar import decode
 from PIL import Image
@@ -57,7 +65,6 @@ END_CODE = 0
 
 def decode_qrcode(img):
     result = decode(img)
-    print(result)
     if (len(result)>0):
         num = int(result[0].data)
         if num == END_CODE:
@@ -73,75 +80,74 @@ def decode_qrcode(img):
 def main():
  
     
-    import os
+    import os, glob
 
     folder_path = config["aria_recordings"]["vrs_glob"]
     
-    save_info(0,0,0,0,0,0,True)
     
-    for filename in os.listdir(folder_path):
-        if filename.endswith('.vrs'):
-            file_path = os.path.join(folder_path, filename)
-            print(f"Elaborating file {file_path}")
-        
-        
-            provider = BetterAriaProvider(vrs=file_path)
-            eye_gaze = BetterEyeGaze(*provider.get_calibration())
+    for filename in glob.iglob(os.path.join(folder_path,'**/*.vrs'), recursive=True):
+        file_path = os.path.join(folder_path, filename)
+        print(f"Elaborating file {file_path}")
     
-            if False:
-                output_folder = config["aria_recordings"]["output"]
-                gaze_output_folder = config["aria_recordings"]["gaze_output"]
-                from pathlib import Path
-                Path( output_folder).mkdir( parents=True, exist_ok=True )
-                Path( gaze_output_folder).mkdir( parents=True, exist_ok=True )
+    
+        provider = BetterAriaProvider(vrs=file_path)
+        eye_gaze = BetterEyeGaze(*provider.get_calibration())
 
-            start_timestamp, end_timestamp, scene, participant, take = 0, 0, 0, 0, 0
+        if False:
+            output_folder = config["aria_recordings"]["output"]
+            gaze_output_folder = config["aria_recordings"]["gaze_output"]
+            from pathlib import Path
+            Path( output_folder).mkdir( parents=True, exist_ok=True )
+            Path( gaze_output_folder).mkdir( parents=True, exist_ok=True )
+        start_timestamp, end_timestamp, scene, participant, take = 0, 0, 0, 0, 0
+        
+        started = False
+        
+        imgs = []
+        imgs_et = []
+        for time in provider.get_time_range(time_step=1_000_000_000):
+            print(f"INFO: Checking frame at time {time}")
+            frame = {}
             
-            started = False
+            frame['rgb'], _ = provider.get_frame(Streams.RGB, time_ns=time)
             
-            imgs = []
-            imgs_et = []
-            for time in provider.get_time_range(time_step=500_000_000):
-                print(f"INFO: Checking frame at time {time}")
-                frame = {}
+            
+            
+            
+            img_et, _ = provider.get_frame(Streams.ET, time, False, False)
+            
+            if SLAM:
+                frame['slam_l'], _ = provider.get_frame(Streams.SLAM_L, time)
+                frame['slam_r'], _ = provider.get_frame(Streams.SLAM_R, time)
+            
+            result, res_scene, res_scene, res_take = decode_qrcode(frame['rgb'])
+            
+            if result == "start" and not started:
+                started = True
+                start_timestamp = time
+                scene, participant, take = res_scene, res_scene, res_take
+                print("INFO: ### DETECTED START QR-CODE")
                 
-                frame['rgb'], _ = provider.get_frame(Streams.RGB, time_ns=time)
                 
+            if result == "end" and start_timestamp != 0:
+                end_timestamp = time
+                print("INFO: ### DETECTED END QR-CODE", file_path, start_timestamp, end_timestamp, scene, participant, take)
+                save_info(file_path, start_timestamp, end_timestamp, scene, participant, take)
+                started = False
+                start_timestamp = 0
+            
+            """  
+            if (len(imgs) > 0 and confidence(frame["rgb"], imgs[-1]["rgb"]) < 0.7) or len(imgs) == 0 or ALL_IMAGES:
+                imgs.append(frame)
+                imgs_et.append(img_et)
                 
-                
-                
-                img_et, _ = provider.get_frame(Streams.ET, time, False, False)
-                
-                if SLAM:
-                    frame['slam_l'], _ = provider.get_frame(Streams.SLAM_L, time)
-                    frame['slam_r'], _ = provider.get_frame(Streams.SLAM_R, time)
-                
-                result, res_scene, res_scene, res_take = decode_qrcode(frame['rgb'])
-                
-                if result == "start" and not started:
-                    started = True
-                    start_timestamp = time
-                    scene, participant, take = res_scene, res_scene, res_take
-                    
-                    
-                if result == "end" and start_timestamp != 0:
-                    end_timestamp = time
-                    print(file_path, start_timestamp, end_timestamp, scene, participant, take)
-                    save_info(file_path, start_timestamp, end_timestamp, scene, participant, take)
-                    started = False
-                
-                """  
-                if (len(imgs) > 0 and confidence(frame["rgb"], imgs[-1]["rgb"]) < 0.7) or len(imgs) == 0 or ALL_IMAGES:
-                    imgs.append(frame)
-                    imgs_et.append(img_et)
-                    
-                    print(f"INFO: Frame added to the list.")
-                else:
-                    if blurryness(frame["rgb"]) < blurryness(imgs[-1]["rgb"]):
-                        imgs[-1] = frame
-                        print(
-                            f"INFO: Frame substituted to the last in the list for better sharpness."
-                        )"""
+                print(f"INFO: Frame added to the list.")
+            else:
+                if blurryness(frame["rgb"]) < blurryness(imgs[-1]["rgb"]):
+                    imgs[-1] = frame
+                    print(
+                        f"INFO: Frame substituted to the last in the list for better sharpness."
+                    )"""
 
         # cv2.circle(img, eye_gaze.rotate_pixel_cw90(gaze_center_in_pixels) , 5, (255, 0, 0), 2)
         # sleep(0.3)
