@@ -13,6 +13,11 @@ SLAM = False
 import tomllib
 config = tomllib.load(open("config.toml", "rb"))
 
+import os, glob
+
+def getSyncedVRSFiles(vrs_path):
+    sessionFolder = Path(vrs_path).parents[1]
+    return glob.glob(str(sessionFolder / '**/*.vrs'), recursive=True)
 
 def confidence(img1, img2):
 
@@ -40,10 +45,10 @@ def save_info(file_path, start_timestamp, end_timestamp,scene,participant,take):
         
         if not csv_file_exists:
             #save header once
-            fields=['file_path','session_id', 'start_timestamp','end_timestamp','scene','participant','take']
+            fields=['session_id', 'file_paths', 'start_timestamp','end_timestamp','scene','participant','take']
             writer.writerow(fields)
         
-        fields=[file_path, Path(file_path).parts[-2],  start_timestamp,end_timestamp,scene,participant,take]
+        fields=[Path(file_path).parts[-3], getSyncedVRSFiles(file_path), start_timestamp,end_timestamp,scene,participant,take]
         writer.writerow(fields)
 
 
@@ -80,7 +85,6 @@ def decode_qrcode(img):
 def main():
  
     
-    import os, glob
 
     folder_path = config["aria_recordings"]["vrs_glob"]
     
