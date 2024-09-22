@@ -9,7 +9,6 @@ config = tomllib.load(open("config.toml", "rb"))
 csv_file = config["aria_recordings"]["recordings_sheet"]
 df = pd.read_csv(csv_file)
 base_path_root = config["aria_recordings"]["frames_path_root"]
-eye_tracking_device_id = config["gaze_estimation"]["eye_tracking_device_id"]
 
 
 for _, row in df.iterrows():
@@ -21,6 +20,7 @@ for _, row in df.iterrows():
     scene = row['scene']
     participant = row['participant']
     take = row['take']
+    et_device_id = row['et_device_id']
     
     for file_path in file_paths: 
         device_id = Path(file_path).parts[-2]
@@ -31,7 +31,7 @@ for _, row in df.iterrows():
             input_vrs_path= str(file_path),
             imgs_output_dir = os.path.join(base_path_root, folder_name),
             gaze_output_folder = os.path.join(base_path_root, "gaze_info",  folder_name),
-            export_gaze_info = device_id == eye_tracking_device_id,
+            export_gaze_info = device_id == et_device_id,
             export_time_step = 1000000000,
             export_slam_camera_frames = True,
             min_confidence = 0.7,

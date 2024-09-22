@@ -7,6 +7,7 @@ import os, glob, csv
 import tomllib
 
 config = tomllib.load(open("config.toml", "rb"))
+eye_tracking_device_id = config["gaze_estimation"]["eye_tracking_device_id"]
 
 def getSyncedVRSFiles(vrs_path):
     sessionFolder = Path(vrs_path).parents[1]
@@ -32,6 +33,7 @@ def save_info(file_path, start_timestamp, end_timestamp, scene, participant, tak
                 "scene",
                 "participant",
                 "take",
+                "et_device_id"
             ]
             writer.writerow(fields)
 
@@ -43,6 +45,7 @@ def save_info(file_path, start_timestamp, end_timestamp, scene, participant, tak
             scene,
             participant,
             take,
+            eye_tracking_device_id 
         ]
         writer.writerow(fields)
 
