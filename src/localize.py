@@ -60,7 +60,7 @@ def localize(query, images, model_parent):
     import numpy as np
     inl_3d = np.array([model.points3D[pid].xyz for pid in np.array(log['points3D_ids'])[ret['inliers']]])
     viz_3d.plot_points(fig, inl_3d, color="lime", ps=1, name=query)
-    fig.show()
+    fig.show() 
 
 
 import multiprocessing
