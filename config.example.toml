@@ -3,9 +3,12 @@ dataset_path = 'path_to_/Dataset' #folder containing the images
 gaze_output_path = 'path_to_/GazeOutput' #folder containing the npz files
 FPV_image_id = 1
 
+[gaze_estimation]
+eye_tracking_device_id = "XYZ"
 
 
 [aria_recordings]
 
 recordings_sheet = "path_to_/recordings_sheet.csv" #csv with timestamp info about takes
-vrs_glob = "path_to_raw_vrss_folder" #folder containing all the ofiginal files
+vrs_glob = "path_to_raw_vrss_folder" #folder containing all the original files
+frames_path_root =  "path_to_frames_folder" #folder containing all the frames
