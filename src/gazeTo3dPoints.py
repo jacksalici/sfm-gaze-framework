@@ -149,6 +149,11 @@ def select_nearest(vector, origin, points3D):
     point3D_position = np.array(points3D[distance_min_point_id].xyz)
     return point3D_position, distance_min
 
+def find_lying_point(vector, cpf, point):
+    distance = np.linalg.norm(cpf-point)
+    v_norm = vector / np.linalg.norm(vector)
+    return cpf + distance * v_norm
+    
 
 def save_info(image_file_path, cpf, gaze_vector, point3D_position, distance_min):
     csv_file = config["gaze_estimation"]["gaze_3d_output"]
@@ -166,13 +171,14 @@ def save_info(image_file_path, cpf, gaze_vector, point3D_position, distance_min)
                 "image_file_path",
                 "cpf",
                 "gaze_vector",
-                "point3d_position",
+                "nearest_point3d",
                 "distance_min",
+                "reprojected_point3d"
             ]
             writer.writerow(fields)
 
         fields = [
-            image_file_path, cpf, gaze_vector, point3D_position, distance_min
+            image_file_path, cpf, gaze_vector, point3D_position, distance_min, find_lying_point(gaze_vector, cpf, point3D_position)
         ]
         writer.writerow(fields)
 
