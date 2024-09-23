@@ -76,23 +76,19 @@ def import_model(model_path: Path):
     return cameras, images, points3D
 
 
-def calc_camera_parameters(camera, image):
+def calc_camera_parameters(camera, image, npz_file):
 
     # Extrinsic parameters
     R = qvec2rotmat(image.qvec)
     t = image.tvec.reshape(3, 1)
     E = np.hstack((R, t))
 
-    # Intrinsic parameters
-    file = os.path.join(config["gaze_output_path"], f"img{image.name[3]}.npz")
 
-    if os.path.isfile(file):
 
-        npz_file = np.load(file)
         # use exact intrinsic
-        params = npz_file["rbg_camera_intrinsic"]
-        f, c = params[:2], params[2:]
-        K = np.array(
+    params = npz_file["rbg_camera_intrinsic"]
+    f, c = params[:2], params[2:]
+    K = np.array(
             [
                 [f[0], 0, c[0]],
                 [0, f[1], c[1]],
@@ -104,7 +100,7 @@ def calc_camera_parameters(camera, image):
 
 
 def add_gaze_direction(camera, image, npz_file):
-    E, K = calc_camera_parameters(camera, image)
+    E, K = calc_camera_parameters(camera, image, npz_file)
 
     gaze_yaw_pitch = npz_file["gaze_yaw_pitch"]
     yaw_cpf, pitch_cpf = gaze_yaw_pitch[0], gaze_yaw_pitch[1]
@@ -184,13 +180,16 @@ def save_info(image_file_path, cpf, gaze_vector, point3D_position, distance_min)
 def main() -> None:
 
     cameras, images, points3D = import_model(Path(config["model_path"]) / "sfm")
-
+    print(images)
     for image in images.values():
+        if config["gaze_estimation"]["eye_tracking_device_id"] not in (image.name).split('_'):
+            continue
+        
         camera = cameras[image.camera_id]
-        idx_match = re.search(r"\d+", image.name)[0]
+        
         npz_file_path = os.path.join(
-                config["gaze_output_path"],
-                f"img{idx_match}.npz",
+                config["gaze_output_path"], (image.name).split('/')[0],
+                f"{(image.name).split('/')[1][:-4]}.npz",
             )
         npz_file = np.load(
             npz_file_path

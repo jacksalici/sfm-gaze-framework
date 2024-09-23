@@ -8,7 +8,8 @@ from pathlib import Path
 config = tomllib.load(open("config.toml", "rb"))
 csv_file = config["aria_recordings"]["recordings_sheet"]
 df = pd.read_csv(csv_file)
-base_path_root = config["aria_recordings"]["frames_path_root"]
+frames_path_root = config["aria_recordings"]["frames_path_root"]
+gaze_path_root = config["aria_recordings"]["gaze_output"]
 
 
 for _, row in df.iterrows():
@@ -29,12 +30,14 @@ for _, row in df.iterrows():
             
         exportFrames(
             input_vrs_path= str(file_path),
-            imgs_output_dir = os.path.join(base_path_root, folder_name),
-            gaze_output_folder = os.path.join(base_path_root, "gaze_info",  folder_name),
+            imgs_output_dir = os.path.join(frames_path_root, folder_name),
+            gaze_output_folder = os.path.join(gaze_path_root, folder_name),
             export_gaze_info = device_id == et_device_id,
             export_time_step = 1000000000,
             export_slam_camera_frames = True,
             min_confidence = 0.7,
             show_preview = False,
-            range_limits_ns = (start_timestamp, end_timestamp)
+            range_limits_ns = (start_timestamp, end_timestamp),
+            filename_prefix= f"{scene}_{participant}_{take}_{device_id}_", 
+            filename_w_timestamp = True
         )

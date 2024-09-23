@@ -167,8 +167,8 @@ def download_all_files():
 #ticsync_client_files = dict{shared_session_id : [[device_serial, rec_uuid]]}
 
     for session_id, file_info in ticsync_server_files.items():
-        opt_path = pathlib.Path(base_path / session_id / file_info[1])
-        if opt_path.exists():
+        opt_path = pathlib.Path(base_path / session_id/  file_info[1])
+        if (opt_path).exists():
             print(f"{opt_path} already there")
             continue
         download_vrs_file(file_info[1], file_info[2], str(opt_path) )
@@ -176,7 +176,7 @@ def download_all_files():
     for session_id, clients in ticsync_client_files.items():
         for file_info in clients:
             opt_path = pathlib.Path(base_path / session_id / file_info[0])
-            if opt_path.exists():
+            if (opt_path).exists():
                 print(f"{opt_path} already there")
                 continue
             download_vrs_file(file_info[0], file_info[1], str(opt_path) )

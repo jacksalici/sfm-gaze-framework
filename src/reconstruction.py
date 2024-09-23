@@ -27,7 +27,7 @@ def reconstruct(images: Path, outputs: Path):
     feature_conf = extract_features.confs["superpoint_max"]
     matcher_conf = match_features.confs["superpoint+lightglue"]
 
-    references = [p.relative_to(images).as_posix() for p in (images).iterdir()]
+    references = [p.relative_to(images).as_posix() for p in images.rglob('*.jpg')]
     print(len(references), "mapping images")
     #plot_images([read_image(images / r) for r in references], dpi=25)
 
