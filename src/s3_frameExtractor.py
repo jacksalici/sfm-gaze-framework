@@ -2,18 +2,12 @@ import pandas as pd
 import ast
 from aria_glasses_utils.BetterFrameExtractor import exportFrames
 import os, glob, csv
-import tomllib
 from pathlib import Path
 
-config = tomllib.load(open("config.toml", "rb"))
-csv_file = config["aria_recordings"]["recordings_sheet"]
-df = pd.read_csv(csv_file)
-frames_path_root = config["aria_recordings"]["frames_path_root"]
-gaze_path_root = config["aria_recordings"]["gaze_output"]
 
+def extractor(csv_file, frames_path_root, gaze_path_root):
+    df = pd.read_csv(csv_file)
 
-
-def frameExtractor()
     for _, row in df.iterrows():
         session_id = row['session_id']
         # Parse the string representation of the list into an actual list
@@ -44,4 +38,12 @@ def frameExtractor()
             )
 
 
-def main()
+if __name__=="__main__":
+    import tomllib
+    
+    config = tomllib.load(open("config.toml", "rb"))
+    csv_file = config["aria_recordings"]["recordings_sheet"]
+    frames_path_root = config["aria_recordings"]["frames_path_root"]
+    gaze_path_root = config["aria_recordings"]["gaze_output"]
+    
+    extractor(csv_file, frames_path_root, frames_path_root)

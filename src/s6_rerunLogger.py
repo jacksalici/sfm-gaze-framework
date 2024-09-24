@@ -23,60 +23,6 @@ import tomllib
 config = tomllib.load(open("config.toml", "rb"))
 
 FILTER_MIN_VISIBLE = 20
-FPV_IMAGE_NAME = "img8rgb.jpg"
-
-PHOTOS = "1"  # ALL / ALL_RGB / 1 / None
-
-
-def scale_camera(
-    camera: Camera, resize: tuple[int, int]
-) -> tuple[Camera, npt.NDArray[np.float_]]:
-    """Scale the camera intrinsics to match the resized image."""
-    assert camera.model == "PINHOLE"
-    new_width = resize[0]
-    new_height = resize[1]
-    scale_factor = np.array([new_width / camera.width, new_height / camera.height])
-
-    # For PINHOLE camera model, params are: [focal_length_x, focal_length_y, principal_point_x, principal_point_y]
-    new_params = np.append(
-        camera.params[:2] * scale_factor, camera.params[2:] * scale_factor
-    )
-
-    return (
-        Camera(camera.id, camera.model, new_width, new_height, new_params),
-        scale_factor,
-    )
-    
-def inv_transformation_matrix(E):
-    R = E[:3, :3]
-    T = E[:3, -1].reshape((3,1))
-    assert R.shape == (3,3) and T.shape == (3, 1)
-    return np.hstack((R.T,-R.T@T))
-    
-
-
-def reproject_point(E, point3D, inv=True):
-    """Reproject 3d point from the frame of camera 1 to the global frame
-    
-    E: Extrinsic Matrix from "World Space" to Point Space
-
-    Returns:
-        list: 2d point expressed as pixel of the 2 camera image.
-    """
-    
-    if inv:
-        E = inv_transformation_matrix(E)
-        
-    if E.shape == (3, 4):
-        E = np.append(E, [[0, 0, 0, 1]], axis=0)
-    
-    point3D_homogeneous = np.append(point3D, 1)  # Convert to homogeneous coordinates
-    point3d_E = (
-        E
-        @ point3D_homogeneous
-    )
-
-    return point3d_E[:3]
 
 
 def import_model(model_path: Path):
@@ -109,22 +55,6 @@ def read_and_log_sparse_reconstruction(
     for image in sorted(images.values(), key=lambda im: im.name):  # type: ignore[no-any-return]
         image_file = dataset_path / image.name
 
-        if PHOTOS == "ALL_RGB" and "rgb" not in image.name:
-            continue
-
-        elif PHOTOS == None:
-            continue
-
-        elif PHOTOS == "1" and FPV_IMAGE_NAME != image.name:
-            continue
-
-        if not os.path.exists(image_file):
-            continue
-
-        # COLMAP sets image ids that don't match the original video frame
-        idx_match = re.search(r"\d+", image.name)
-        assert idx_match is not None
-        frame_idx = int(idx_match.group(0))
 
         quat_xyzw = image.qvec[[1, 2, 3, 0]]  # COLMAP uses wxyz quaternions
         camera = cameras[image.camera_id]
@@ -343,31 +273,6 @@ def pitch_yaw_to_vector(yaw_rad, pitch_rad):
     return direction / np.linalg.norm(direction)
 
 
-def select_nearest(vector, origin, points3D):
-    distance_min = np.inf
-    distance_min_point_id = 0
-
-    for p_id, p in points3D.items():
-        point_position = np.array(p.xyz)
-        
-        distance_cur = np.linalg.norm(np.cross(vector-origin, point_position-origin)) / np.linalg.norm(vector-origin)
-        
-        if distance_cur<distance_min:
-            distance_min = distance_cur
-            distance_min_point_id = p_id
-            
-    print(distance_min_point_id, distance_min)
-
-
-
-    point3D_position = np.array(points3D[distance_min_point_id].xyz)
-    
-    rr.log(
-        "/nearestPoint",
-        rr.Points3D(point3D_position, colors=[0,0,0]),
-        timeless=True,
-    )
-
 
 def main() -> None:
     parser = ArgumentParser(
@@ -401,10 +306,6 @@ def main() -> None:
         Path(config["dataset_path"]),
         resize=args.resize,
     )
-
-    cpf, vector = add_gaze_direction(cameras, images)
-    select_nearest(vector, cpf, points3D)
-    add_gaze_direction_from_point(cameras, images)
 
 
     rr.script_teardown(args)
