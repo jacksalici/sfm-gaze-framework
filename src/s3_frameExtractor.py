@@ -44,6 +44,6 @@ if __name__=="__main__":
     config = tomllib.load(open("config.toml", "rb"))
     csv_file = config["aria_recordings"]["recordings_sheet"]
     frames_path_root = config["aria_recordings"]["frames_path_root"]
-    gaze_path_root = config["aria_recordings"]["gaze_output"]
+    gaze_path_root = config["aria_recordings"]["model_path"]
     
     extractor(csv_file, frames_path_root, frames_path_root)
