@@ -30,7 +30,7 @@ def extractor(csv_file, frames_path_root, gaze_path_root):
                 gaze_output_folder = os.path.join(gaze_path_root, folder_name),
                 export_gaze_info = device_id == et_device_id,
                 export_time_step = 1000000000,
-                export_slam_camera_frames = True,
+                export_slam_camera_frames = False,
                 min_confidence = 0.7,
                 show_preview = False,
                 range_limits_ns = (start_timestamp, end_timestamp),

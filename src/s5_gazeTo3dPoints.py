@@ -16,10 +16,10 @@ import numpy.typing as npt
 
 from external.read_write_model import Camera, read_model, qvec2rotmat
 
-import tomllib
+
 import csv
 
-config = tomllib.load(open("config.toml", "rb"))
+
 
 
 def scale_camera(
@@ -155,8 +155,8 @@ def find_lying_point(vector, cpf, point):
     return cpf + distance * v_norm
     
 
-def save_info(image_file_path, cpf, gaze_vector, point3D_position, distance_min):
-    csv_file = config["gaze_estimation"]["gaze_3d_output"]
+def save_info(csv_file, image_file_path, cpf, gaze_vector, point3D_position, distance_min):
+    print("INFO: Saving image gaze")
     csv_file_exists = True
 
     if not os.path.exists(csv_file):
@@ -183,18 +183,18 @@ def save_info(image_file_path, cpf, gaze_vector, point3D_position, distance_min)
         writer.writerow(fields)
 
 
-def main() -> None:
+def gaze2points(csv_file, model_path, gaze_base_path, eye_tracking_device_id ) -> None:
 
-    cameras, images, points3D = import_model(Path(config["model_path"]) / "sfm")
-    print(images)
+    cameras, images, points3D = import_model(Path(model_path) / "sfm")
     for image in images.values():
-        if config["gaze_estimation"]["eye_tracking_device_id"] not in (image.name).split('_'):
+        folder = (image.name).split('/')[0]
+        if eye_tracking_device_id not in folder.split('_'):
             continue
         
         camera = cameras[image.camera_id]
         
         npz_file_path = os.path.join(
-                config["gaze_output_path"], (image.name).split('/')[0],
+                gaze_base_path, (image.name).split('/')[0],
                 f"{(image.name).split('/')[1][:-4]}.npz",
             )
         npz_file = np.load(
@@ -203,8 +203,17 @@ def main() -> None:
 
         cpf, vector = add_gaze_direction(camera, image, npz_file)
         point3D_position, distance_min = select_nearest(vector, cpf, points3D)
-        save_info(npz_file_path, cpf, vector, point3D_position, distance_min)
+        save_info(csv_file, npz_file_path, cpf, vector, point3D_position, distance_min)
 
 
 if __name__ == "__main__":
-    main()
+    import tomllib
+    config = tomllib.load(open("config.toml", "rb"))
+    csv_file = config["gaze_estimation"]["gaze_3d_output"]
+    gaze_base_path = config["gaze_output_path"]
+    model_path = config["model_path"]
+    eye_tracking_device_id = config["gaze_estimation"]["eye_tracking_device_id"]
+    
+    gaze2points(csv_file, model_path, gaze_base_path, eye_tracking_device_id)
+    
+
