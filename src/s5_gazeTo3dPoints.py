@@ -76,7 +76,7 @@ def import_model(model_path: Path):
     return cameras, images, points3D
 
 
-def calc_camera_parameters(camera, image, npz_file):
+def calc_camera_parameters(image, npz_file):
 
     # Extrinsic parameters
     R = qvec2rotmat(image.qvec)
@@ -99,8 +99,8 @@ def calc_camera_parameters(camera, image, npz_file):
     return E, K
 
 
-def add_gaze_direction(camera, image, npz_file):
-    E, K = calc_camera_parameters(camera, image, npz_file)
+def add_gaze_direction(image, npz_file):
+    E, K = calc_camera_parameters(image, npz_file)
 
     gaze_yaw_pitch = npz_file["gaze_yaw_pitch"]
     yaw_cpf, pitch_cpf = gaze_yaw_pitch[0], gaze_yaw_pitch[1]
@@ -201,7 +201,7 @@ def gaze2points(csv_file, model_path, gaze_base_path, eye_tracking_device_id ) -
             npz_file_path
         )
 
-        cpf, vector = add_gaze_direction(camera, image, npz_file)
+        cpf, vector = add_gaze_direction(image, npz_file)
         point3D_position, distance_min = select_nearest(vector, cpf, points3D)
         save_info(csv_file, npz_file_path, cpf, vector, point3D_position, distance_min)
 
