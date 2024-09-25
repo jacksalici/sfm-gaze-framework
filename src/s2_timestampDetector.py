@@ -95,13 +95,13 @@ def main():
 
             frame["rgb"], _ = provider.get_frame(Streams.RGB, time_ns=time)
 
-            result, res_scene, res_scene, res_take = decode_qrcode(frame["rgb"])
+            result, res_scene, res_participant, res_take = decode_qrcode(frame["rgb"])
 
-            if result == "start" and not started:
+            if (result == "start") and (not started or (res_scene == scene and res_participant == participant and res_take == take+1)):
                 started = True
                 start_timestamp = time
-                scene, participant, take = res_scene, res_scene, res_take
-                print("INFO: ### DETECTED START QR-CODE")
+                scene, participant, take = res_scene, res_participant, res_take
+                print("INFO: ### DETECTED START QR-CODE", scene, participant, take)
 
             if result == "end" and start_timestamp != 0:
                 end_timestamp = time
