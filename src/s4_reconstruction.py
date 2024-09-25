@@ -50,8 +50,8 @@ import multiprocessing
 if __name__ == '__main__':
     multiprocessing.freeze_support()  # Only needed for frozen executables
 
-    import tomllib
-    config = tomllib.load(open("config.toml", "rb"))
+    import toml
+    config = toml.load("config.toml")
     
     images = Path(config['dataset_path'])
     outputs = Path(config['model_path'])
