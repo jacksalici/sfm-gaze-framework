@@ -14,7 +14,7 @@ from hloc.visualization import plot_images, read_image
 from hloc.utils import viz_3d
 
 
-def reconstruct(images: Path, outputs: Path):
+def reconstruct(images: Path, outputs: Path, preview = False):
     
     sfm_pairs = outputs / "pairs-sfm.txt"
     sfm_dir = outputs / "sfm"
@@ -39,11 +39,12 @@ def reconstruct(images: Path, outputs: Path):
 
     model = reconstruction.main(sfm_dir, images, sfm_pairs, features, matches, image_list=references)
 
-    fig = viz_3d.init_figure()
-    viz_3d.plot_reconstruction(
-        fig, model, color="rgba(255,0,0,0.5)", name="mapping", points_rgb=True
-    )
-    fig.show()
+    if preview:
+        fig = viz_3d.init_figure()
+        viz_3d.plot_reconstruction(
+            fig, model, color="rgba(255,0,0,0.5)", name="mapping", points_rgb=True
+        )
+        fig.show()
 
 import multiprocessing
 if __name__ == '__main__':
