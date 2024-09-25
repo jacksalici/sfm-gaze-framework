@@ -97,11 +97,11 @@ def main():
 
             result, res_scene, res_participant, res_take = decode_qrcode(frame["rgb"])
 
-            if (result == "start") and (not started or (res_scene == scene and res_participant == participant and res_take == take+1)):
+            if (result == "start") and not started:
                 started = True
                 start_timestamp = time
                 scene, participant, take = res_scene, res_participant, res_take
-                print("INFO: ### DETECTED START QR-CODE", scene, participant, take)
+                print("INFO: ### DETECTED START QR-CODE")
 
             if result == "end" and start_timestamp != 0:
                 end_timestamp = time
@@ -119,6 +119,27 @@ def main():
                 )
                 started = False
                 start_timestamp = 0
+                
+            if  result == "start" and (res_scene == scene and res_participant == participant and res_take == take+1):
+                end_timestamp = time
+
+                print(
+                    "INFO: ### DETECTED END-TAKE QR-CODE, NEW TAKE BEGINS.",
+                    file_path,
+                    start_timestamp,
+                    end_timestamp,
+                    scene,
+                    participant,
+                    take,
+                )
+                save_info(
+                    file_path, start_timestamp, end_timestamp, scene, participant, take
+                )
+                # restart
+                scene, participant, take = res_scene, res_participant, res_take
+
+                started = True
+                start_timestamp = time
 
 
 if __name__ == "__main__":
