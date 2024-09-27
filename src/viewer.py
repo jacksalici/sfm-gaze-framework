@@ -36,8 +36,8 @@ def get_paired_path(image_file_path):
         parts = image_file_path.split('/')
         file_id = os.path.splitext(parts[-1])[0]  
         new_device_code = '1WM093700T1276'  
-        return  '/'.join(parts[:-4]) + f"/frames/{parts[-3]}/{'_'.join(parts[-2].split('_')[:-1])}_{new_device_code}/{file_id}.jpg", '/'.join(
-            parts[:-4]) + f"/frames/{parts[-3]}/{parts[-2]}/{file_id}.jpg"
+        return  '/'.join(parts[:-4]) + f"/Frames/{parts[-3]}/{new_device_code}/{file_id}.jpg", '/'.join(
+            parts[:-4]) + f"/Frames/{parts[-3]}/{parts[-2]}/{file_id}.jpg"
     
 
 def viewer2D(csv_gaze_file, colmap_images):
@@ -74,25 +74,36 @@ def viewer2D(csv_gaze_file, colmap_images):
         
             E, K = calc_camera_parameters(colmap_images[colmap_image_id], npz_file)
         
-            point = K @ reproject_point(E, reprojected_point3d)
+            point = K @ reproject_point(E, reprojected_point3d, inv=True)
             point = (point / point[2])[:2]
+            
+            E, K = calc_camera_parameters(colmap_images[colmap_image_id_fpv], npz_file)
     
             r_cpf = K @ reproject_point(E, cpf, inv=True)
             r_cpf = (r_cpf / r_cpf[2])[:2]
     
             img = cv2.imread(img_path)
+            print(img.shape)
             if img is None:
                 print(f"Image not found")
                 continue 
             
             print(point)
             if  0 <= point[0] < img.shape[0] and 0 <= point[1] < img.shape[1]:
-                img = cv2.circle(img, point, 4, ( 255, 0, 0 ) , 2)   
+                point = (int(point[0]), int(point[1]))  
+                img = cv2.circle(img, point, 4, ( 0, 255, 255 ) , 2)   
+                print ("added gazed point")
             
             print(r_cpf)
             if  0 <= r_cpf[0] < img.shape[0] and 0 <= r_cpf[1] < img.shape[1]:
-                img = cv2.circle(img, r_cpf, 4, ( 255, 255, 0 ) , 2) 
-                
+                r_cpf = (int(r_cpf[0]), int(r_cpf[1]))  
+                img = cv2.circle(img, r_cpf, 4, ( 0, 255, 255 ) , 2) 
+                print ("added cpf")
+            
+            fpv_img = cv2.imread(fpv_path)
+            fpv_img = cv2.circle(fpv_img, npz_file["gaze_center_in_rgb_pixels"], 4, (0, 255, 255), 4)
+            cv2.imshow("Image Viewer 2", fpv_img)
+
             cv2.imshow("Image Viewer", img)
 
             key = cv2.waitKey(0)  

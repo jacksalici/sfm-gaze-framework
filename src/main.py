@@ -58,27 +58,29 @@ def pipeline(session_id, steps = "123"):
                 print("\n######################\nSTEP 3: Project gaze\n\n")
                 csv_file_gaze = os.path.join(config["gaze_estimation"]["gaze_3d_output_folder"], folder + '.csv')
 
-                gaze2points(csv_file_gaze, os.path.join(model_path_root, folder + '.csv'), os.path.join(gaze_path_root, folder + '.csv'), eye_tracking_device_id)
+                gaze2points(csv_file_gaze, os.path.join(model_path_root, folder), os.path.join(gaze_path_root, folder), eye_tracking_device_id)
 
-    except:
-        print("Error.")
+    except Exception as e:
+        print("Error.", e)
+        return
     
     
     
     
     
 def main():
-    import argparse, glob
+    import argparse, glob, toml
+    config = toml.load("config.toml")
 
     parser = argparse.ArgumentParser(description="Process session argument.")
     parser.add_argument('--session', '-s', required=False, help="Specify the session ID")
     parser.add_argument('--steps', '-p', type=str, required=False, default="123", help="Specify the steps to do")
-    parser.add_argument('--glob_sessions_folder', '-g', type=str, required=False)
+    parser.add_argument('--glob_sessions_folder', '-g', action="store_true", default=False, required=False)
     args = parser.parse_args()
     if args.session:
         pipeline(args.session, args.steps)
     elif args.glob_sessions_folder:
-        for folder in glob.glob("*", root_dir=args.glob_sessions_folder):
+        for folder in glob.glob("*", root_dir=config["aria_recordings"]["vrs_glob"]):
             pipeline(folder, args.steps)
     
 
