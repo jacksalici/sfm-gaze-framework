@@ -64,14 +64,16 @@ END_CODE = 0
 
 def decode_qrcode(img):
     result = decode(img)
-    if len(result) > 0:
-        num = int(result[0].data)
-        if num == END_CODE:
-            return "end", 0, 0, 0
-        else:
-            scene, participant, take = extract_codes(num)
-            return "start", scene, participant, take
-
+    try:
+        if len(result) > 0:
+            num = int(result[0].data)
+            if num == END_CODE:
+                return "end", 0, 0, 0
+            else:
+                scene, participant, take = extract_codes(num)
+                return "start", scene, participant, take
+    except Exception as e:
+        print("ERROR:", e)
     return None, None, None, None
 
 
@@ -89,7 +91,7 @@ def main():
 
         started = False
 
-        for time in provider.get_time_range(time_step=1_000_000_000):
+        for time in provider.get_time_range(time_step=100_000_000):
             print(f"INFO: Checking frame at time {time}")
             frame = {}
 
