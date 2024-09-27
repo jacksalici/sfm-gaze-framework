@@ -32,13 +32,14 @@ def import_model(model_path: Path):
 
 
 def read_and_log_sparse_reconstruction(
-    cameras, images, points3D, dataset_path: Path, resize: tuple[int, int] | None
+    cameras, images, points3D, dataset_path: Path, gaze_path:Path,
 ) -> None:
+    
 
     print("INFO: Building visualization by logging to Rerun")
 
-    rr.log("/", rr.ViewCoordinates.RIGHT_HAND_Y_DOWN)
-    # rr.log("plot/avg_reproj_err", rr.SeriesLine(color=[240, 45, 58]))
+    rr.log("/", rr.ViewCoordinates.RIGHT_HAND_Y_DOWN, static=True)
+    rr.log("plot/avg_reproj_err", rr.SeriesLine(color=[240, 45, 58]), static=True)
 
     # Iterate through images (video frames) logging data related to each frame.
     points = [point.xyz for point in points3D.values()]
@@ -49,48 +50,52 @@ def read_and_log_sparse_reconstruction(
         "/points",
         rr.Points3D(points, colors=point_colors),
         rr.AnyValues(error=point_errors),
-        timeless=True,
+        static=True,
     )
 
-    for image in sorted(images.values(), key=lambda im: im.name):  # type: ignore[no-any-return]
-        image_file = dataset_path / image.name
-
-
+    for image in sorted(images.values(), key=lambda im: im.name.split('/')[1]):  # type: ignore[no-any-return]
+        name_parts = (image.name).split('/')
+        
+        rr.set_time_nanos("sync_timestamp", int(name_parts[1][:-4]))
+        
+        
         quat_xyzw = image.qvec[[1, 2, 3, 0]]  # COLMAP uses wxyz quaternions
         camera = cameras[image.camera_id]
-        if resize:
-            camera, scale_factor = scale_camera(camera, resize)
-        else:
-            scale_factor = np.array([1.0, 1.0])
+
 
         visible = [
             id != -1 and points3D.get(id) is not None for id in image.point3D_ids
         ]
         visible_ids = image.point3D_ids[visible]
 
+        visible_xyzs = [points3D[id] for id in visible_ids]
         visible_xys = image.xys[visible]
-        if resize:
-            visible_xys *= scale_factor
+  
 
-        # rr.set_time_sequence("frame", frame_idx)
+        points = [point.xyz for point in visible_xyzs]
+        point_errors = [point.error for point in visible_xyzs]
+    
+        rr.log("plot/avg_reproj_err", rr.Scalar(np.mean(point_errors)))
+
+        #rr.log("points", rr.Points3D(points, colors=point_colors), rr.AnyValues(error=point_errors))
 
         # COLMAP's camera transform is "camera from world"
         rr.log(
-            f"camera{image.camera_id}",
+            f"camera{name_parts[0]}",
             rr.Transform3D(
                 translation=image.tvec,
                 rotation=rr.Quaternion(xyzw=quat_xyzw),
                 from_parent=True,
             ),
-            # timeless=True,
+            #static=True,
         )
         rr.log(
-            f"camera{image.camera_id}",
-            rr.ViewCoordinates.RDF,  # timeless=True
-        )  # X=Right, Y=Down, Z=Forward
-
+            f"camera{name_parts[0]}",
+            rr.ViewCoordinates.RDF,   static=True
+        ) # X=Right, Y=Down, Z=Forward
+ 
         file = os.path.join(
-            config["gaze_output_path"], f"img{image.name[3]}.npz"
+             str(gaze_path), f"{(image.name).split('/')[1].split('.')[0]}.npz"
         )
 
         if os.path.isfile(file):
@@ -101,6 +106,7 @@ def read_and_log_sparse_reconstruction(
             f, c = params[:2], params[2:]
 
         else:
+            print("WARNING: npz file not loaded")
             f, c = camera.params[:2], camera.params[2:]
 
             if camera.model != "PINHOLE":
@@ -110,120 +116,25 @@ def read_and_log_sparse_reconstruction(
                 ]
 
         rr.log(
-            f"camera{image.camera_id}/image",
+            f"camera{name_parts[0]}/image",
             rr.Pinhole(
                 resolution=[camera.width, camera.height],
                 focal_length=f,
                 principal_point=c,
             ),
-            # timeless=True,
         )
 
-        if resize:
-            bgr = cv2.imread(str(image_file))
-            bgr = cv2.resize(bgr, resize)
-            rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-            rr.log(
-                f"camera{image.camera_id}/image",
-                rr.Image(rgb).compress(jpeg_quality=75),
-            )
-        else:
-            rr.log(
-                f"camera{image.camera_id}/image",
-                rr.ImageEncoded(path=dataset_path / image.name),
-                # timeless=True
-            )
 
         rr.log(
-            f"camera{image.camera_id}/image/keypoints",
-            rr.Points2D(visible_xys, colors=[34, 138, 167]),
-            # timeless=True
-        )
+            f"camera{name_parts[0]}/image",
+            rr.ImageEncoded(path=dataset_path / name_parts[0] / name_parts[1]),
+            )
+
+        #rr.log(    f"camera{name_parts[0]}/image/keypoints",rr.Points2D(visible_xys, colors=[34, 138, 167]),# static=True)
 
 
-def calc_fpv_camera_parameters(cameras, images):
 
-    for image_id, image in images.items():
-        if image.name != FPV_IMAGE_NAME:
-            continue
-        
-        camera = cameras[image.camera_id]
-
-        # Extrinsic parameters
-        R = qvec2rotmat(image.qvec)
-        t = image.tvec.reshape(3, 1)
-        E = np.hstack((R, t))
-
-        # Intrinsic parameters
-        file = os.path.join(
-            config["gaze_output_path"], f"img{image.name[3]}.npz"
-        )
-
-        if os.path.isfile(file):
-
-            npz_file = np.load(file)
-            # use exact intrinsic
-            params = npz_file["rbg_camera_intrinsic"]
-            f, c = params[:2], params[2:]
-            K = np.array(
-                    [
-                        [f[0], 0, c[0]],
-                        [0, f[1], c[1]],
-                        [0, 0, 1],
-                    ]
-                )
-            
-        else:
-            if camera.model == "PINHOLE" or camera.model == "OPENCV":
-                K = np.array(
-                    [
-                        [camera.params[0], 0, camera.params[2]],
-                        [0, camera.params[1], camera.params[3]],
-                        [0, 0, 1],
-                    ]
-                )
-            elif (
-                camera.model == "SIMPLE_PINHOLE"
-                or camera.model == "SIMPLE_RADIAL"
-                or camera.model == "RADIAL"
-            ):
-                K = np.array(
-                    [
-                        [camera.params[0], 0, camera.params[1]],
-                        [0, camera.params[0], camera.params[2]],
-                        [0, 0, 1],
-                    ]
-                )
-            else:
-                raise Exception(f"Camera model {camera.model} is not supported")
-
-    return E, K
-
-
-def add_gaze_direction(cameras, images):
-    E, K = calc_fpv_camera_parameters(cameras, images)
-
-    npz_file = np.load(
-        os.path.join(
-            config["gaze_output_path"],
-            FPV_IMAGE_NAME[0:4] + ".npz",
-        )
-    )
-
-
-    gaze_yaw_pitch = npz_file["gaze_yaw_pitch"]
-    yaw_cpf, pitch_cpf = gaze_yaw_pitch[0], gaze_yaw_pitch[1]
-
-    vector_cpf = pitch_yaw_to_vector(pitch_cpf, yaw_cpf)
-    
-    E_cpf2rgb = npz_file["rbg2cpf_camera_extrinsic"]
-    
-    cpf_w = reproject_point(E, reproject_point(E_cpf2rgb, [0, 0, 0]))
-    
-    vector_rgb = (inv_transformation_matrix(E_cpf2rgb) @ np.append(vector_cpf, [1]))[:3]
-
-    vector_w = reproject_point(E, vector_rgb)
-    
+def add_gaze_direction( vector_w, cpf_w):
     
     rr.log(
         "gaze",
@@ -234,18 +145,12 @@ def add_gaze_direction(cameras, images):
         ),
     )
     
-    return vector_w, cpf_w
-
-def add_gaze_direction_from_point(cameras, images):
-    E, K = calc_fpv_camera_parameters(cameras, images)
-
-    npz_file = np.load(
-        os.path.join(
-            config["gaze_output_path"],
-            FPV_IMAGE_NAME[0:4] + ".npz",
-        )
-    )
     
+from s5_gazeTo3dPoints import reproject_point, calc_camera_parameters
+
+def add_gaze_direction_from_point(image, npz_file):
+    E, K = calc_camera_parameters(image, npz_file)
+
     gaze_rgb = npz_file["gaze_center_in_rgb_frame"]
     
     rgb_w = reproject_point(E, [0, 0, 0])
@@ -262,49 +167,39 @@ def add_gaze_direction_from_point(cameras, images):
     
    
 
-def pitch_yaw_to_vector(yaw_rad, pitch_rad):
-    # inspired by https://github.com/facebookresearch/projectaria_tools/blob/3f6079ffcd21b8975fed2ce2bef211473bc498ad/core/mps/EyeGazeReader.h#L40
-
-    x = np.tan(yaw_rad)
-    y = np.tan(pitch_rad)
-    z = 1
-
-    direction = np.array([x, y, z])
-    return direction / np.linalg.norm(direction)
-
-
-
 def main() -> None:
-    parser = ArgumentParser(
-        description="Visualize the output of COLMAP's sparse reconstruction on a video."
-    )
-    parser.add_argument(
-        "--resize", action="store", help="Target resolution to resize images"
-    )
+    parser = ArgumentParser()
+
     rr.script_add_args(parser)
+    
+    parser.add_argument('--scene', '-s', type=str, required=True)
     args = parser.parse_args()
 
-    if args.resize:
-        args.resize = tuple(int(x) for x in args.resize.split("x"))
 
-    blueprint = rrb.Horizontal(
+
+    blueprint = rrb.Vertical(
         rrb.Spatial3DView(name="3D", origin="/"),
+        rrb.Horizontal(
+            rrb.TimeSeriesView(origin="/plot"),
+            rrb.Spatial2DView(name="FPV Camera", origin=f"/camera{config['gaze_estimation']['eye_tracking_device_id']}/image")
+        )
+
     )
 
     rr.script_setup(
-        args, "rerun_example_structure_from_motion", default_blueprint=blueprint
+        args, "sfm_gaze_dataset", default_blueprint=blueprint
     )
-
+    folder = args.scene
     cameras, images, points3D = import_model(
-        Path(config["model_path"]) / "sfm"
+        Path(config["aria_recordings"]["model_path"]) / folder / "sfm"
     )
 
     read_and_log_sparse_reconstruction(
         cameras,
         images,
         points3D,
-        Path(config["dataset_path"]),
-        resize=args.resize,
+        Path(config["aria_recordings"]["frames_path_root"]) / folder,
+        Path(config["aria_recordings"]["gaze_output"]) / folder / config["gaze_estimation"]["eye_tracking_device_id"] ,
     )
 
 
