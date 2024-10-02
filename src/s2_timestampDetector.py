@@ -83,6 +83,8 @@ def main():
 
     for filename in glob.iglob(os.path.join(folder_path, "**/*.vrs"), recursive=True):
         file_path = os.path.join(folder_path, filename)
+        if config["gaze_estimation"]["timestamp_device_id"] not in file_path:
+            continue
         print(f"Elaborating file {file_path}")
 
         provider = BetterAriaProvider(vrs=file_path)
@@ -90,8 +92,8 @@ def main():
         start_timestamp, end_timestamp, scene, participant, take = 0, 0, 0, 0, 0
 
         started = False
-
-        for time in provider.get_time_range(time_step=100_000_000):
+        time_step=100_000_000
+        for time in provider.get_time_range(time_step=time_step):
             print(f"INFO: Checking frame at time {time}")
             frame = {}
 
@@ -105,7 +107,7 @@ def main():
                 scene, participant, take = res_scene, res_participant, res_take
                 print("INFO: ### DETECTED START QR-CODE")
 
-            if result == "end" and start_timestamp != 0:
+            if (result == "end" and start_timestamp != 0) or time >= provider.t_last - time_step :
                 end_timestamp = time
                 print(
                     "INFO: ### DETECTED END QR-CODE",

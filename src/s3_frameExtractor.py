@@ -11,7 +11,7 @@ def extractor(csv_file, frames_path_root, gaze_path_root, chosen_session_id = ""
     for _, row in df.iterrows():
         session_id = row['session_id']
         
-        if session_id != chosen_session_id:
+        if session_id != chosen_session_id and chosen_session_id != "":
             continue
         
         # Parse the string representation of the list into an actual list
