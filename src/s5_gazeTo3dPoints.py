@@ -19,7 +19,7 @@ from external.read_write_model import Camera, read_model, qvec2rotmat
 
 import csv
 
-
+DISTANCE_THRESHOLD: Final = 0.3  # meters
 
 
 def scale_camera(
@@ -102,20 +102,25 @@ def calc_camera_parameters(image, npz_file):
 def add_gaze_direction(image, npz_file):
     E, K = calc_camera_parameters(image, npz_file)
 
-    gaze_yaw_pitch = npz_file["gaze_yaw_pitch"]
-    yaw_cpf, pitch_cpf = gaze_yaw_pitch[0], gaze_yaw_pitch[1]
+    #gaze_yaw_pitch = npz_file["gaze_yaw_pitch"]
+    #yaw_cpf, pitch_cpf = gaze_yaw_pitch[0], gaze_yaw_pitch[1]
+    #vector_cpf = pitch_yaw_to_vector(yaw_cpf, pitch_cpf)
 
-    vector_cpf = pitch_yaw_to_vector(pitch_cpf, yaw_cpf)
+    # computed from the cpf frame directly and not from the YP, better results 
 
-    E_cpf2rgb = npz_file["rbg2cpf_camera_extrinsic"]
+    gaze_cpf = npz_file["gaze_center_in_cpf"]
+    
+    E_cpf2rgb = inv_transformation_matrix(npz_file["rbg2cpf_camera_extrinsic"])
 
-    cpf_w = reproject_point(E, reproject_point(E_cpf2rgb, [0, 0, 0]))
 
-    vector_rgb = (inv_transformation_matrix(E_cpf2rgb) @ np.append(vector_cpf, [1]))[:3]
+    
+    gaze_rgb = reproject_point(E_cpf2rgb, gaze_cpf)
+    gaze_w = reproject_point(E, gaze_rgb)
+        
 
-    vector_w = reproject_point(E, vector_rgb)
+    cpf_w = reproject_point(E, reproject_point(E_cpf2rgb, [0, 0, 0]))   
 
-    return vector_w, cpf_w
+    return cpf_w, gaze_w
 
 
 def pitch_yaw_to_vector(yaw_rad, pitch_rad):
@@ -129,33 +134,50 @@ def pitch_yaw_to_vector(yaw_rad, pitch_rad):
     return direction / np.linalg.norm(direction)
 
 
-def select_nearest(vector, origin, points3D):
+def select_nearest(gaze, origin, points3D):
     distance_min = np.inf
-    distance_min_point_id = 0
+    distance_min_point_id = None
 
     for p_id, p in points3D.items():
         point_position = np.array(p.xyz)
 
-        distance_cur = np.linalg.norm(
-            np.cross(vector - origin, point_position - origin)
-        ) / np.linalg.norm(vector - origin)
+        vector_to_point = point_position - origin
+        direction_vector = gaze - origin
 
-        if distance_cur < distance_min:
-            distance_min = distance_cur
-            distance_min_point_id = p_id
+        if np.dot(vector_to_point, direction_vector) > 0 and np.linalg.norm(vector_to_point):  # Dot product > 0 means "in front" and at least some distance from the CPF
+
+            distance_cur = np.linalg.norm(
+                np.cross(direction_vector, vector_to_point)
+            ) / np.linalg.norm(direction_vector)
+
+            if distance_cur < distance_min:
+                distance_min = distance_cur
+                distance_min_point_id = p_id
 
     print(f"MIN DISTANCE: {distance_min}")
 
-    point3D_position = np.array(points3D[distance_min_point_id].xyz)
-    return point3D_position, distance_min
+    if distance_min_point_id is not None:
+        print(f"MIN DISTANCE: {distance_min}")
+        point3D_position = np.array(points3D[distance_min_point_id].xyz)
+        return point3D_position, distance_min
+    else:
+        print("No points found in front of the origin.")
+        return None, None
 
 def find_lying_point(vector, cpf, point):
-    distance = np.linalg.norm(cpf-point)
+    vector_to_point = point - cpf
+    
+    # Normalize the directional vector
     v_norm = vector / np.linalg.norm(vector)
-    return cpf + distance * v_norm
+    
+    # Project vector_to_point onto the normalized vector
+    projection_length = np.dot(vector_to_point, v_norm)
+    
+    # Use this projection length to find the new point
+    return cpf + projection_length * v_norm
     
 
-def save_info(csv_file, image_file_path, cpf, gaze_vector, point3D_position, distance_min):
+def save_info(csv_file, image_file_path, cpf, gaze_vector, nerarest_3dpoint, distance_min):
     print("INFO: Saving image gaze")
     csv_file_exists = True
 
@@ -178,7 +200,7 @@ def save_info(csv_file, image_file_path, cpf, gaze_vector, point3D_position, dis
             writer.writerow(fields)
 
         fields = [
-            image_file_path, cpf, gaze_vector, point3D_position, distance_min, find_lying_point(gaze_vector, cpf, point3D_position)
+            image_file_path, cpf, gaze_vector, nerarest_3dpoint, distance_min, find_lying_point(gaze_vector, cpf, nerarest_3dpoint)
         ]
         writer.writerow(fields)
 
@@ -201,19 +223,30 @@ def gaze2points(csv_file, model_path, gaze_base_path, eye_tracking_device_id ) -
             npz_file_path
         )
 
-        cpf, vector = add_gaze_direction(image, npz_file)
-        point3D_position, distance_min = select_nearest(vector, cpf, points3D)
-        save_info(csv_file, npz_file_path, cpf, vector, point3D_position, distance_min)
+        cpf, gaze = add_gaze_direction(image, npz_file)
+        nearestPoint3D, distance_min = select_nearest(gaze, cpf, points3D)
+        save_info(csv_file, npz_file_path, cpf, gaze-cpf, nearestPoint3D, distance_min)
 
 
 if __name__ == "__main__":
     import tomllib
     config = tomllib.load(open("config.toml", "rb"))
-    csv_file = config["gaze_estimation"]["gaze_3d_output"]
-    gaze_base_path = config["gaze_output_path"]
-    model_path = config["model_path"]
+    
+    parser = ArgumentParser()
+    
+    parser.add_argument('--scene', '-s', type=str, required=False, default="6_1_1")
+    args = parser.parse_args()
+    
+    csv_file = Path(config["gaze_estimation"]["gaze_3d_output_folder"]) / (args.scene+".csv")
+    gaze_base_path = str(Path(config["aria_recordings"]["gaze_output"]) / args.scene)
+    model_path = str(Path(config["aria_recordings"]["model_path"]) / args.scene)
     eye_tracking_device_id = config["gaze_estimation"]["eye_tracking_device_id"]
     
-    gaze2points(csv_file, model_path, gaze_base_path, eye_tracking_device_id)
+    csv_file.unlink( missing_ok=True)
+
+        
+    gaze2points(str(csv_file), model_path, gaze_base_path, eye_tracking_device_id)
     
+    
+
 

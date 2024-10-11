@@ -16,7 +16,7 @@ import numpy as np
 import numpy.typing as npt
 import rerun as rr
 import rerun.blueprint as rrb
-
+import pandas as pd
 from external.read_write_model import Camera, read_model, qvec2rotmat
 
 import tomllib
@@ -24,6 +24,19 @@ config = tomllib.load(open("config.toml", "rb"))
 
 FILTER_MIN_VISIBLE = 20
 
+def get_cpf_and_reprojected_point3d(image_file_path, df: pd.DataFrame):
+    row = df[df['image_file_path'].str.endswith("/".join(image_file_path.split("/")[-3:]))]
+    if not row.empty:
+
+        cpf = np.fromstring(str(row['cpf'].values[0]).strip()[1:-1], sep=" ")
+        gaze_vector = np.fromstring(str(row['gaze_vector'].values[0]).strip()[1:-1],  sep=" ")
+        reprojected_point3d = np.fromstring(str(row['reprojected_point3d'].values[0]).strip()[1:-1],  sep=" ")
+
+        nearest_p = np.fromstring(str(row['nearest_point3d'].values[0]).strip()[1:-1],  sep=" ")
+
+        return reprojected_point3d, cpf, nearest_p, gaze_vector
+
+    return None, None, None, None
 
 def import_model(model_path: Path):
     print("INFO: Reading sparse COLMAP reconstruction")
@@ -32,7 +45,7 @@ def import_model(model_path: Path):
 
 
 def read_and_log_sparse_reconstruction(
-    cameras, images, points3D, dataset_path: Path, gaze_path:Path,
+    cameras, images, points3D, dataset_path: Path, gaze_path:Path, df: pd.DataFrame
 ) -> None:
     
 
@@ -106,7 +119,7 @@ def read_and_log_sparse_reconstruction(
             f, c = params[:2], params[2:]
 
         else:
-            print("WARNING: npz file not loaded")
+            print("WARNING: npz file not loaded", file)
             f, c = camera.params[:2], camera.params[2:]
 
             if camera.model != "PINHOLE":
@@ -132,38 +145,69 @@ def read_and_log_sparse_reconstruction(
 
         #rr.log(    f"camera{name_parts[0]}/image/keypoints",rr.Points2D(visible_xys, colors=[34, 138, 167]),# static=True)
 
-
+        try:
+            gaze3d, cpf3d, nearest_point, gaze_vector = get_cpf_and_reprojected_point3d(file, df)
+            add_gaze_direction(gaze3d, cpf3d)
+            add_gaze_direction_from_point(image, npz_file)
+            rr.log(
+            f"/nearest_point",
+            rr.Points3D([nearest_point]),
+            )
+            
+            rr.log(
+            f"/gaze_point",
+            rr.Points3D([gaze3d]),
+            )
+            
+            rr.log(
+                "gaze_vector",
+                rr.Arrows3D(
+                    vectors=[gaze_vector-cpf3d],
+                    origins=[cpf3d],
+                    colors=[1, 0.7, 0.7],
+                ),
+            )
+        except Exception as e:
+            print("ERROR: ", e )
+        
 
 def add_gaze_direction( vector_w, cpf_w):
     
     rr.log(
         "gaze",
         rr.Arrows3D(
-            vectors=[(vector_w-cpf_w)*10],
+            vectors=[vector_w-cpf_w],
             origins=[cpf_w],
             colors=[1, 0.7, 0.7],
         ),
     )
     
     
-from s5_gazeTo3dPoints import reproject_point, calc_camera_parameters
+from s5_gazeTo3dPoints import reproject_point, calc_camera_parameters, inv_transformation_matrix
 
 def add_gaze_direction_from_point(image, npz_file):
     E, K = calc_camera_parameters(image, npz_file)
 
-    gaze_rgb = npz_file["gaze_center_in_rgb_frame"]
+    gaze_cpf = npz_file["gaze_center_in_cpf"]
     
-    rgb_w = reproject_point(E, [0, 0, 0])
+    E_cpf2rgb = inv_transformation_matrix(npz_file["rbg2cpf_camera_extrinsic"])
+
+    cpf_rgb = reproject_point(E_cpf2rgb, [0, 0, 0])
+    cpf_w = reproject_point(E, cpf_rgb)
+    
+    gaze_rgb = reproject_point(E_cpf2rgb, gaze_cpf)
     gaze_w = reproject_point(E, gaze_rgb)
     
     rr.log(
-        "gaze2",
+        "gaze_computed_in_rerun",
         rr.Arrows3D(
-            vectors=[(gaze_w-rgb_w)*10],
-            origins=[rgb_w],
+            vectors=[(gaze_w-cpf_w)*10],
+            origins=[cpf_w],
             colors=[0.7, 1, 0.7],
         ),
     )
+    
+    
     
    
 
@@ -172,10 +216,10 @@ def main() -> None:
 
     rr.script_add_args(parser)
     
-    parser.add_argument('--scene', '-s', type=str, required=True)
+    parser.add_argument('--scene', '-s', type=str, required=False, default="5_1_1")
     args = parser.parse_args()
 
-
+    df = pd.read_csv(os.path.join(config["gaze_estimation"]["gaze_3d_output_folder"], f"{args.scene}.csv"))
 
     blueprint = rrb.Vertical(
         rrb.Spatial3DView(name="3D", origin="/"),
@@ -200,6 +244,7 @@ def main() -> None:
         points3D,
         Path(config["aria_recordings"]["frames_path_root"]) / folder,
         Path(config["aria_recordings"]["gaze_output"]) / folder / config["gaze_estimation"]["eye_tracking_device_id"] ,
+        df
     )
 
 
