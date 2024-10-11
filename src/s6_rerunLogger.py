@@ -148,35 +148,38 @@ def read_and_log_sparse_reconstruction(
         try:
             gaze3d, cpf3d, nearest_point, gaze_vector = get_cpf_and_reprojected_point3d(file, df)
             add_gaze_direction(gaze3d, cpf3d)
-            add_gaze_direction_from_point(image, npz_file)
+            #add_gaze_direction_from_point(image, npz_file)
             rr.log(
             f"/nearest_point",
-            rr.Points3D([nearest_point]),
+            rr.Points3D([nearest_point], colors=[1,0,0]),
             )
             
+        except Exception as e:
+            print("ERROR: ", e )
+            
+            
+        ## add 2d point
+        
+        try:
+            pixel = npz_file["gaze_center_in_rgb_pixels"]
+            gaze3d, cpf3d, nearest_point, gaze_vector = get_cpf_and_reprojected_point3d(file, df)
+            add_gaze_direction(gaze3d, cpf3d)
+            #add_gaze_direction_from_point(image, npz_file)
             rr.log(
-            f"/gaze_point",
-            rr.Points3D([gaze3d]),
+            f"/camera{config['gaze_estimation']['eye_tracking_device_id']}/image/point",
+            rr.Points2D([pixel], colors=[1,0,0]),
             )
             
-            rr.log(
-                "gaze_vector",
-                rr.Arrows3D(
-                    vectors=[gaze_vector-cpf3d],
-                    origins=[cpf3d],
-                    colors=[1, 0.7, 0.7],
-                ),
-            )
         except Exception as e:
             print("ERROR: ", e )
         
 
-def add_gaze_direction( vector_w, cpf_w):
+def add_gaze_direction( gaze3d, cpf_w):
     
     rr.log(
         "gaze",
         rr.Arrows3D(
-            vectors=[vector_w-cpf_w],
+            vectors=[gaze3d-cpf_w],
             origins=[cpf_w],
             colors=[1, 0.7, 0.7],
         ),
