@@ -1,6 +1,6 @@
 # SFM-based gaze estimation framework
 
-⚠️ More detail will be added soon.
+⚠️ More details will be added soon.
 
 ## Pipeline 🚥
 
