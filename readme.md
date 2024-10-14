@@ -1,4 +1,6 @@
-# SFM-based gaze estimation dataset
+# SFM-based gaze estimation framework
+
+⚠️ More detail will be added soon.
 
 ## Pipeline 🚥
 

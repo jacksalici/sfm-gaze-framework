@@ -228,7 +228,9 @@ def main() -> None:
         rrb.Spatial3DView(name="3D", origin="/"),
         rrb.Horizontal(
             rrb.TimeSeriesView(origin="/plot"),
-            rrb.Spatial2DView(name="FPV Camera", origin=f"/camera{config['gaze_estimation']['eye_tracking_device_id']}/image")
+            rrb.Spatial2DView(name="FPV Camera", origin=f"/camera{config['gaze_estimation']['eye_tracking_device_id']}/image"),
+            rrb.Spatial2DView(name="External Camera", origin=f"/camera{config['gaze_estimation']['timestamp_device_id']}/image")
+
         )
 
     )
