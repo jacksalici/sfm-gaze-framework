@@ -2,7 +2,7 @@
 
 > This work has been developed as part of my Master's Degree Thesis title **"Leveraging Gaze Estimation in Human-Robot Interaction: development of a Framework for Eye Tracking in the Wild"**, under the supervision of Prof. R. Vezzani. 🎓
 
-![Example of the framework output](https://raw.githubusercontent.com/jacksalici/sfm-gaze-estimation-framework/main/imgs/fw-example.png)
+![Example of the framework output](https://raw.githubusercontent.com/jacksalici/sfm-gaze-framework/refs/heads/main/imgs/fw-example.png)
 
 ## Abstract 📜
 
